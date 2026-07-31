@@ -9,6 +9,7 @@ import { biomeLabels, CARD_POOL, DEFAULT_MODIFIERS, getBiome, getModeLabel, merg
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
 type SignalShard = { x: number; y: number; z: number }
 type SignalGate = { x: number; y: number; z: number; radius: number }
+type SignalArtifact = { x: number; y: number; z: number; label: string }
 type GhostFrame = { t: number; x: number; y: number; z: number }
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -86,6 +87,15 @@ const signalGates: SignalGate[] = [
   { x: 0, y: 87, z: -88, radius: 6.4 },
 ]
 
+const signalArtifacts: SignalArtifact[] = [
+  { x: 4.2, y: 26.7, z: -13.6, label: 'RUST KEY' },
+  { x: -4.2, y: 39.4, z: -20.8, label: 'NIGHT KEY' },
+  { x: 4.4, y: 52.2, z: -28.1, label: 'CLOUD KEY' },
+  { x: -4.3, y: 65, z: -35.4, label: 'VOID KEY' },
+  { x: 4.1, y: 77.8, z: -42.7, label: 'SUN KEY' },
+  { x: -3.7, y: 90.6, z: -49.9, label: 'CORE KEY' },
+]
+
 function PlatformMesh({ platform }: { platform: Platform }) {
   const color = platform.kind === 'container' ? '#b74727' : platform.kind === 'sign' ? '#d7ad47' : platform.kind === 'cloud' ? '#dfe6e3' : '#6b5f49'
   return <group position={[platform.x, platform.y, platform.z]}>
@@ -103,6 +113,16 @@ function SignalShardMesh({ shard, collected }: { shard: SignalShard; collected: 
   if (collected) return null
   return <Float speed={2.2} rotationIntensity={.6} floatIntensity={.45} position={[shard.x, shard.y, shard.z]}>
     <mesh castShadow><octahedronGeometry args={[.24, 0]} /><meshStandardMaterial color="#ec4f2d" emissive="#9f2817" emissiveIntensity={1.2} metalness={.75} roughness={.22} /></mesh>
+  </Float>
+}
+
+function SignalArtifactMesh({ artifact, collected }: { artifact: SignalArtifact; collected: boolean }) {
+  if (collected) return null
+  return <Float speed={1.4} rotationIntensity={.9} floatIntensity={.6} position={[artifact.x, artifact.y, artifact.z]}>
+    <group>
+      <mesh castShadow><dodecahedronGeometry args={[.33, 0]} /><meshStandardMaterial color="#6fd1cf" emissive="#287f82" emissiveIntensity={1.2} metalness={.75} roughness={.2} /></mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.55, .025, 8, 24]} /><meshStandardMaterial color="#9af2e8" emissive="#4bc5c2" emissiveIntensity={1.4} transparent opacity={.8} /></mesh>
+    </group>
   </Float>
 }
 
@@ -152,7 +172,7 @@ function EchoRunner({ path, active, runId }: { path: GhostFrame[]; active: boole
   </group>
 }
 
-function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGate, onGhostFrame, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
@@ -160,6 +180,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGat
   const nextReport = useRef(0)
   const claimedShards = useRef(new Set<number>())
   const claimedGates = useRef(new Set<number>())
+  const claimedArtifacts = useRef(new Set<number>())
   const grounded = useRef(true)
   const yaw = useRef(.28)
   const pitch = useRef(.12)
@@ -198,6 +219,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGat
     keys.current = {}
     completedRun.current = false
     claimedGates.current = new Set()
+    claimedArtifacts.current = new Set()
     runClock.current = 0
     nextGhostSample.current = 0
   }, [running])
@@ -277,6 +299,12 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGat
         onGate(index)
       }
     })
+    signalArtifacts.forEach((artifact, index) => {
+      if (!claimedArtifacts.current.has(index) && position.current.distanceTo(new THREE.Vector3(artifact.x, artifact.y, artifact.z)) < 1.15) {
+        claimedArtifacts.current.add(index)
+        onArtifact(index)
+      }
+    })
     if (!completedRun.current && position.current.y >= courseHeight - 1.5) { completedRun.current = true; onComplete() }
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
@@ -287,7 +315,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGat
   </group>
 }
 
-function World({ running, mode, modifiers, biome, ghostPath, runId, onProgress, onFall, collectedShards, onCollect, onGate, onGhostFrame, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; onCollect: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function World({ running, mode, modifiers, biome, ghostPath, runId, onProgress, onFall, collectedShards, collectedArtifacts, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; collectedArtifacts: Set<number>; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   const biomePalette = biome === 'neon-underpass' ? { sky: '#9b9bb6', fog: '#545775', ambient: '#d6d8f2', ground: '#313743' } : biome === 'cloud-cathedral' ? { sky: '#c9d8df', fog: '#a4b9c1', ambient: '#eff7ff', ground: '#61727a' } : biome === 'signal-core' ? { sky: '#e4c9b5', fog: '#b98172', ambient: '#ffe6c7', ground: '#3a2928' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
   const contractTint = mode === 'stormline' ? { sky: '#879a9a', fog: '#667b7b', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : biomePalette
@@ -305,10 +333,11 @@ function World({ running, mode, modifiers, biome, ghostPath, runId, onProgress, 
     <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
     {platforms.map((p, i) => <PlatformMesh platform={p} key={i} />)}
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
+    {signalArtifacts.map((artifact, i) => <SignalArtifactMesh artifact={artifact} collected={collectedArtifacts.has(i)} key={`artifact-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
-    <Player running={running} mode={mode} modifiers={modifiers} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
+    <Player running={running} mode={mode} modifiers={modifiers} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -340,6 +369,7 @@ function App() {
   const [pendingCards, setPendingCards] = useState<SignalCard[]>([])
   const [cardSeed, setCardSeed] = useState(0)
   const [gateHits, setGateHits] = useState<Set<number>>(new Set())
+  const [artifactHits, setArtifactHits] = useState<Set<number>>(new Set())
   const [ghostPath, setGhostPath] = useState<GhostFrame[]>(() => {
     try { return JSON.parse(localStorage.getItem('summit-signal-echo') || '[]') as GhostFrame[] } catch { return [] }
   })
@@ -353,7 +383,7 @@ function App() {
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); recording.current = []; setRunId(current => current + 1); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
+  const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); recording.current = []; setRunId(current => current + 1); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setArtifactHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -378,8 +408,9 @@ function App() {
   }
   const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false); playCue(audio.current, 'checkpoint') }
   const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`); playCue(audio.current, 'gate') }
+  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · +2 STREAK`); playCue(audio.current, 'shard') }
   return <main>
-    <World running={running} mode={mode} modifiers={modifiers} biome={biome} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); playCue(audio.current, 'shard') }} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { playCue(audio.current, 'land'); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); playCue(audio.current, 'burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
+    <World running={running} mode={mode} modifiers={modifiers} biome={biome} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); playCue(audio.current, 'shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { playCue(audio.current, 'land'); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); playCue(audio.current, 'burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
@@ -389,13 +420,14 @@ function App() {
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
+    {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/6</strong><small>FIND THE KEYS</small></div>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SHIFT BURST · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
-    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
+    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · CACHE {artifactHits.size}/6</small></p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
