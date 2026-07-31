@@ -193,6 +193,24 @@ function DistrictPulse({ y, z, color }: { y: number; z: number; color: string })
   </group>
 }
 
+function SkyFreighter({ position, color, phase }: { position: [number, number, number]; color: string; phase: number }) {
+  const ship = useRef<THREE.Group>(null)
+  useFrame((state) => {
+    if (!ship.current) return
+    ship.current.position.x = position[0] + Math.sin(state.clock.elapsedTime * .08 + phase) * 3.8
+    ship.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * .34 + phase) * .45
+    ship.current.rotation.z = Math.sin(state.clock.elapsedTime * .28 + phase) * .025
+  })
+  return <group ref={ship} position={position}>
+    <pointLight color={color} intensity={2.5} distance={14} decay={2} />
+    <mesh castShadow scale={[2.8, .55, 1.05]}><sphereGeometry args={[1, 16, 10]} /><meshStandardMaterial color="#202935" metalness={.78} roughness={.28} /></mesh>
+    <mesh position={[0, .35, 0]}><boxGeometry args={[1.35, .32, .72]} /><meshStandardMaterial color="#64727d" metalness={.55} roughness={.3} /></mesh>
+    <mesh position={[0, .58, 0]}><boxGeometry args={[.75, .12, .48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.8} transparent opacity={.88} /></mesh>
+    {[-1.65, 1.65].map((x) => <mesh key={x} position={[x, -.18, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[.18, .18, .55, 10]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} /></mesh>)}
+    <mesh position={[0, -.58, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.1, .035, 8, 24]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.4} transparent opacity={.55} depthWrite={false} /></mesh>
+  </group>
+}
+
 function WorldBackdrop({ mode }: { mode: RunMode }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -207,6 +225,9 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
   ], [])
   const gates = useMemo(() => Array.from({ length: 4 }, (_, index) => ({ y: 18 + index * 23, z: -13 - index * 25, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
   return <group>
+    <SkyFreighter position={[-16, 28, -58]} color={stormline ? '#ff6670' : '#62ded7'} phase={.2} />
+    <SkyFreighter position={[15, 55, -83]} color={zenith ? '#9ce8ff' : '#f0c56f'} phase={2.3} />
+    <SkyFreighter position={[-18, 79, -112]} color={stormline ? '#ff6670' : '#c681ff'} phase={4.7} />
     <RouteRail mode={mode} />
     <DistrictPulse y={18} z={-13} color={stormline ? '#ff5362' : '#f0b85f'} />
     <DistrictPulse y={41} z={-38} color={zenith ? '#8ce7ff' : '#58e4dc'} />
