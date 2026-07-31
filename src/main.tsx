@@ -176,6 +176,17 @@ function EchoRunner({ path, active, runId }: { path: GhostFrame[]; active: boole
   </group>
 }
 
+function StormFlash({ active }: { active: boolean }) {
+  const light = useRef<THREE.PointLight>(null)
+  useFrame((state) => {
+    if (!light.current) return
+    const cycle = state.clock.elapsedTime % 8
+    const strike = active && ((cycle > 1.14 && cycle < 1.2) || (cycle > 1.25 && cycle < 1.29) || (cycle > 5.65 && cycle < 5.72))
+    light.current.intensity = strike ? 18 : 0
+  })
+  return <pointLight ref={light} position={[2, 28, -35]} color="#c6e6ff" distance={95} decay={2} intensity={0} />
+}
+
 function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
@@ -366,6 +377,7 @@ function World({ running, mode, modifiers, biome, heat, ghostPath, runId, onProg
     <ambientLight intensity={1.55} color={palette.ambient} />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
+    <StormFlash active={mode === 'stormline' || heat > 88} />
     <Environment preset="sunset" />
     <WorldBackdrop mode={mode} />
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
