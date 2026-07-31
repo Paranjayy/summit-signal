@@ -28,6 +28,13 @@ const contractComplete = (contract: RunContract, stats: { falls: number; airGate
 const contractProgress = (contract: RunContract, stats: { falls: number; airGates: number; artifacts: number; perfects: number }) => contract.kind === 'clean' ? `${stats.falls ? 'BROKEN' : 'LIVE'}` : contract.kind === 'air' ? `${Math.min(3, stats.airGates)}/3` : contract.kind === 'cache' ? `${Math.min(6, stats.artifacts)}/6` : `${Math.min(8, stats.perfects)}/8`
 const dailyMutator: DailyMutator = (['redline', 'low-gravity', 'blackout'] as DailyMutator[])[new Date().getDate() % 3]
 const dailyMutatorLabel = dailyMutator === 'redline' ? 'REDLINE DAY' : dailyMutator === 'low-gravity' ? 'LOW-G DAY' : 'BLACKOUT DAY'
+type RouteEventId = 'surge' | 'crosswind' | 'quiet'
+const routeEventAt = (height: number): RouteEventId => (['surge', 'crosswind', 'quiet'] as RouteEventId[])[Math.floor(Math.max(0, height) / 24) % 3]
+const routeEventLabels: Record<RouteEventId, { title: string; detail: string; accent: string }> = {
+  surge: { title: 'SIGNAL SURGE', detail: 'MOVE SPEED +14%', accent: '#d64735' },
+  crosswind: { title: 'CROSSWIND', detail: 'WIND PULSE +35%', accent: '#5877bd' },
+  quiet: { title: 'QUIET LANE', detail: 'AIR CONTROL +20%', accent: '#3e8f98' },
+}
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
   const remainder = Math.floor(seconds % 60).toString().padStart(2, '0')
@@ -577,8 +584,11 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     coyoteTimer.current = grounded.current ? .12 : Math.max(0, coyoteTimer.current - dt)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
     const dailySpeed = mutator === 'redline' ? 1.1 : 1
-    const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
-    const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
+    const routeEvent = routeEventAt(position.current.y)
+    const eventSpeed = routeEvent === 'surge' ? 1.14 : 1
+    const eventAirControl = routeEvent === 'quiet' ? .2 : 0
+    const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed * eventSpeed + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus + eventAirControl)
+    const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed * eventSpeed - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus + eventAirControl)
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
     burstCooldown.current = Math.max(0, burstCooldown.current - dt)
@@ -624,7 +634,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
       }
     }
     const overdriveWind = heat > 70 ? 1.12 : 1
-    const windScale = (mode === 'stormline' ? 1.65 : mode === 'zenith' ? 1.15 : 1) * modifiers.windMultiplier * overdriveWind
+    const windScale = (mode === 'stormline' ? 1.65 : mode === 'zenith' ? 1.15 : 1) * modifiers.windMultiplier * overdriveWind * (routeEvent === 'crosswind' ? 1.35 : 1)
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5) * windScale
     velocity.current.x += crosswind * dt
     signalGusts.forEach((gust) => {
@@ -846,6 +856,8 @@ function App() {
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const flowMultiplier = 1 + Math.min(2, Math.floor(combo / 5) * .25)
   const biome = getBiome(height, courseHeight)
+  const routeEvent = routeEventAt(height)
+  const routeEventInfo = routeEventLabels[routeEvent]
   const modeLabel = getModeLabel(mode)
   const challengeCode = `SS-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${modeLabel.slice(0, 3)}`
   const cue = (name: AudioCue) => { if (!muted.current) playCue(audio.current, name) }
@@ -917,6 +929,7 @@ function App() {
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className={`run-contract ${contractCleared ? 'cleared' : ''}`} style={{ '--contract-accent': activeContract.accent } as React.CSSProperties}><span>BOUNTY / {activeContract.title}</span><strong>{contractCleared ? 'CLEAR' : contractProgress(activeContract, contractStats)}</strong><small>{activeContract.brief}</small></div>}
     {running && <div className="daily-mutator">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong><small>RULESET ROTATES AT MIDNIGHT</small></div>}
+    {running && <div className="route-event" style={{ '--event-accent': routeEventInfo.accent } as React.CSSProperties}><span>LIVE EVENT</span><strong>{routeEventInfo.title}</strong><small>{routeEventInfo.detail} · DISTRICT SHIFT</small></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/{signalGates.length}</strong><small>RING THE SIGNAL</small></div>}
     {running && <div className="airgate-hunt">AIR GATES <strong>{airGateHits}</strong><small>THREAD THEM MID-AIR</small></div>}
