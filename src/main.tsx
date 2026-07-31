@@ -295,9 +295,10 @@ function SummitBeacon({ active }: { active: boolean }) {
   </group>
 }
 
-function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onComplete: () => void }) {
+function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const grappleBeam = useRef<THREE.Mesh>(null)
+  const phaseShell = useRef<THREE.Mesh>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
@@ -321,12 +322,15 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   const grappleLatch = useRef(false)
   const grappleVisual = useRef(0)
   const hunterCooldown = useRef(0)
+  const phaseCooldown = useRef(0)
+  const phaseVisual = useRef(0)
+  const phaseLatch = useRef(false)
   const grappleTarget = useRef(new THREE.Vector3())
   const runClock = useRef(0)
   const nextGhostSample = useRef(0)
   const cameraShake = useRef(0)
   const checkpoint = useRef(new THREE.Vector3(0, .34, 0))
-  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; grappleVisual.current = 0; hunterCooldown.current = 0; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
+  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; grappleVisual.current = 0; hunterCooldown.current = 0; phaseCooldown.current = 0; phaseVisual.current = 0; phaseLatch.current = false; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
@@ -369,6 +373,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     const wantsJump = Boolean(keys.current[' '] || keys.current.space || keys.current.spacebar)
     const wantsBurst = Boolean(keys.current.shift || keys.current.shiftleft || keys.current.shiftright)
     const wantsGrapple = Boolean(keys.current.e)
+    const wantsPhase = Boolean(keys.current.q)
     if (!wantsJump) { jumpLatch.current = false; jumpBufferTimer.current = 0 } else if (!jumpLatch.current) jumpBufferTimer.current = .12
     coyoteTimer.current = grounded.current ? .12 : Math.max(0, coyoteTimer.current - dt)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
@@ -378,8 +383,18 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
     burstCooldown.current = Math.max(0, burstCooldown.current - dt)
     grappleCooldown.current = Math.max(0, grappleCooldown.current - dt)
+    phaseCooldown.current = Math.max(0, phaseCooldown.current - dt)
+    phaseVisual.current = Math.max(0, phaseVisual.current - dt)
     if (!wantsBurst) burstLatch.current = false
     if (!wantsGrapple) grappleLatch.current = false
+    if (!wantsPhase) phaseLatch.current = false
+    if (wantsPhase && !phaseLatch.current && phaseCooldown.current <= 0) {
+      phaseLatch.current = true
+      phaseCooldown.current = 7
+      phaseVisual.current = 1.25
+      cameraShake.current = Math.max(cameraShake.current, .08)
+      onPhase()
+    }
     if (wantsBurst && !burstLatch.current && burstCooldown.current <= 0) {
       const burstDirection = new THREE.Vector3(targetX, 0, targetZ)
       if (burstDirection.lengthSq() < .01) burstDirection.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
@@ -436,7 +451,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
       }
     }
     if (position.current.y < -5) { const forgiven = onFall(); reset(true); if (forgiven) setTimeout(() => onProgress(Math.max(0, checkpoint.current.y)), 0) }
-    if (hunterCooldown.current <= 0) {
+    if (hunterCooldown.current <= 0 && phaseVisual.current <= 0) {
       const hunterTarget = new THREE.Vector3()
       const hit = signalHunters.some((hunter) => position.current.distanceTo(hunterPosition(hunter, state.clock.elapsedTime, hunterTarget)) < 1.15)
       if (hit) {
@@ -449,6 +464,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
       }
     }
     body.current.position.copy(position.current)
+    if (phaseShell.current) { phaseShell.current.visible = phaseVisual.current > 0; phaseShell.current.rotation.y += dt * 3.2; phaseShell.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 16) * .06) }
     if (grappleBeam.current) {
       if (grappleVisual.current > 0) {
         const beamStart = new THREE.Vector3(0, .8, 0)
@@ -507,6 +523,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
   return <group ref={body} position={[0, .34, 0]} castShadow>
+    <mesh ref={phaseShell} visible={false} position={[0, .68, 0]}><sphereGeometry args={[.72, 16, 12]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={2.4} transparent opacity={.24} depthWrite={false} wireframe /></mesh>
     <mesh ref={grappleBeam} visible={false}><cylinderGeometry args={[.025, .025, 1, 6]} /><meshStandardMaterial color="#72edf1" emissive="#30cbd0" emissiveIntensity={2} transparent opacity={.8} depthWrite={false} /></mesh>
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
@@ -515,7 +532,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   </group>
 }
 
-function World({ running, completed, mode, modifiers, biome, heat, ghostPath, runId, onProgress, onFall, collectedShards, collectedArtifacts, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onComplete }: { running: boolean; completed: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; heat: number; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; collectedArtifacts: Set<number>; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onComplete: () => void }) {
+function World({ running, completed, mode, modifiers, biome, heat, ghostPath, runId, onProgress, onFall, collectedShards, collectedArtifacts, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; completed: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; heat: number; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; collectedArtifacts: Set<number>; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   const biomePalette = biome === 'neon-underpass' ? { sky: '#9b9bb6', fog: '#545775', ambient: '#d6d8f2', ground: '#313743' } : biome === 'cloud-cathedral' ? { sky: '#c9d8df', fog: '#a4b9c1', ambient: '#eff7ff', ground: '#61727a' } : biome === 'signal-core' ? { sky: '#e4c9b5', fog: '#b98172', ambient: '#ffe6c7', ground: '#3a2928' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
   const contractTint = mode === 'stormline' ? { sky: '#879a9a', fog: '#667b7b', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : biomePalette
@@ -540,7 +557,7 @@ function World({ running, completed, mode, modifiers, biome, heat, ghostPath, ru
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
-    <Player running={running} mode={mode} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onComplete={onComplete} />
+    <Player running={running} mode={mode} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -567,6 +584,7 @@ function App() {
   const [signalFlash, setSignalFlash] = useState('')
   const [burstReady, setBurstReady] = useState(true)
   const [grappleReady, setGrappleReady] = useState(true)
+  const [phaseReady, setPhaseReady] = useState(true)
   const [checkpointHeight, setCheckpointHeight] = useState(0)
   const [mode, setMode] = useState<RunMode>('standard')
   const [modifiers, setModifiers] = useState<RunModifiers>(DEFAULT_MODIFIERS)
@@ -605,7 +623,7 @@ function App() {
     const cool = window.setInterval(() => setHeat(current => Math.max(0, current - .7)), 200)
     return () => window.clearInterval(cool)
   }, [running])
-  const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); recording.current = []; setRunId(current => current + 1); setCameraMode('third'); setRunGrade('C'); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setHeat(0); setBurstReady(true); setGrappleReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setArtifactHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
+  const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); recording.current = []; setRunId(current => current + 1); setCameraMode('third'); setRunGrade('C'); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setHeat(0); setBurstReady(true); setGrappleReady(true); setPhaseReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setArtifactHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -636,13 +654,14 @@ function App() {
   const toggleSound = () => { setSoundOn(current => { muted.current = current; return !current }) }
   const copyChallengeCode = () => { void navigator.clipboard?.writeText(challengeCode); setSignalFlash(`RUN CODE COPIED · ${challengeCode}`) }
   return <main className={heat > 70 ? 'heat-hot' : ''}>
-    <World running={running} completed={completed} mode={mode} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); cue('shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { cue('land'); setHeat(current => Math.min(100, current + 5)); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); cue('burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); cue('burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onHunterHit={() => { setHeat(0); setSignalFlash('SIGNAL HUNTER CONTACT · RETURNING TO CHECKPOINT'); cue('fail') }} onComplete={completeRun} />
+    <World running={running} completed={completed} mode={mode} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); cue('shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { cue('land'); setHeat(current => Math.min(100, current + 5)); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); cue('burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); cue('burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onHunterHit={() => { setHeat(0); setSignalFlash('SIGNAL HUNTER CONTACT · RETURNING TO CHECKPOINT'); cue('fail') }} onPhase={() => { setPhaseReady(false); setHeat(current => Math.min(100, current + 10)); setSignalFlash('PHASE SHIFT · HUNTERS BLIND'); cue('burst'); window.setTimeout(() => setPhaseReady(true), 7000) }} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
     {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
     {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
     {running && <section className={`grapple ${grappleReady ? 'ready' : ''}`} aria-label="Grapple line"><span>GRAPPLE LINE</span><strong>{grappleReady ? 'READY' : 'RECHARGING'}</strong><small>E · NEXT LEDGE</small></section>}
+    {running && <section className={`phase ${phaseReady ? 'ready' : ''}`} aria-label="Phase shift"><span>PHASE SHIFT</span><strong>{phaseReady ? 'READY' : 'RECHARGING'}</strong><small>Q · GHOST HUNTERS</small></section>}
     {running && ghostPath.length > 1 && <div className="echo-badge">ECHO <strong>PB GHOST</strong><small>CHASE YOUR LINE</small></div>}
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
