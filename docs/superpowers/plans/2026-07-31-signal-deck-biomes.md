@@ -16,19 +16,19 @@
 - Create: `src/gameData.ts`
 - Modify: `src/main.tsx:1-12`
 
-- [ ] **Step 1: Add typed card and biome definitions**
+- [x] **Step 1: Add typed card and biome definitions**
 
 Create `RunModifiers`, `SignalCard`, `BiomeId`, `CARD_POOL`, `getBiome`, and `getModeLabel`. `getBiome(height, courseHeight)` returns Rust Yard, Neon Underpass, Cloud Cathedral, or Signal Core using normalized height bands. `CARD_POOL` contains the five cards in the design spec and each card has explicit numeric modifier fields.
 
-- [ ] **Step 2: Import the definitions from `main.tsx`**
+- [x] **Step 2: Import the definitions from `main.tsx`**
 
 Replace local `RunMode` declaration with imports from `./gameData` and remove duplicate labels/constants.
 
-- [ ] **Step 3: Run the type checker**
+- [x] **Step 3: Run the type checker**
 
 Run `npm run build`; expected result is a successful build before behavior is wired.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/gameData.ts src/main.tsx
@@ -41,23 +41,23 @@ git commit -m "refactor: centralize route game data"
 - Modify: `src/main.tsx:231-300`
 - Modify: `src/styles.css`
 
-- [ ] **Step 1: Add run-local state**
+- [x] **Step 1: Add run-local state**
 
 Add `activeCards`, `pendingCards`, `cardOpen`, and `modifiers` state in `App`. On `onCheckpoint`, select three distinct cards from `CARD_POOL` with a deterministic rotating index, set `pendingCards`, and pause `running`. On card selection, append the card, merge its modifier fields, clear pending state, and resume.
 
-- [ ] **Step 2: Render keyboard-accessible card choice**
+- [x] **Step 2: Render keyboard-accessible card choice**
 
 Render a `section` with `role="dialog"`, three buttons named `CARD 1`, `CARD 2`, and `CARD 3`, and an Escape handler that chooses card one. The dialog shows title, upside, cost, and `1 / 2 / 3` hints. Render an active-card rail while running.
 
-- [ ] **Step 3: Add visual treatment**
+- [x] **Step 3: Add visual treatment**
 
 Add `.card-dialog`, `.card-options`, `.route-card`, `.active-cards`, and responsive rules. Cards must be readable over the canvas and use accent borders rather than color alone.
 
-- [ ] **Step 4: Run lint and build**
+- [x] **Step 4: Run lint and build**
 
 Run `npm run lint && npm run build`; expected result is clean lint and a successful Vite build.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main.tsx src/styles.css
@@ -70,15 +70,15 @@ git commit -m "feat: add checkpoint signal deck"
 - Modify: `src/main.tsx:70-230`
 - Modify: `src/styles.css`
 
-- [ ] **Step 1: Pass modifiers into Player**
+- [x] **Step 1: Pass modifiers into Player**
 
 Add `modifiers: RunModifiers` to `Player`. Apply `speedMultiplier` to target movement, `windMultiplier` to crosswind, `gravityMultiplier` to falling gravity, `burstCooldownMultiplier` to cooldown, `burstLiftMultiplier` to vertical burst, and `pickupRadius` to shard collection. `anchorCharge` is consumed by the fall callback and exposed via `onAnchorCharge`.
 
-- [ ] **Step 2: Add biome palette mapping**
+- [x] **Step 2: Add biome palette mapping**
 
 Pass `biome={getBiome(height, courseHeight)}` to `World`. Use a palette object for background, fog, ground, and emissive colors; render a compact biome tag in the HUD. Keep the route geometry unchanged.
 
-- [ ] **Step 3: Reset deck state correctly**
+- [x] **Step 3: Reset deck state correctly**
 
 `startRun` resets cards, pending cards, and modifiers to `DEFAULT_MODIFIERS`; `R` continues to reset to origin, while a charged Anchor card prevents one retry increment when a fall occurs.
 
@@ -86,7 +86,7 @@ Pass `biome={getBiome(height, courseHeight)}` to `World`. Use a palette object f
 
 Deploy locally or use the production URL. Start a run, verify card dialog appears after the first checkpoint, select card 2, verify the active-card rail, and confirm the biome label changes after climbing. Also verify pause/resume and finish remain available.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main.tsx src/styles.css
