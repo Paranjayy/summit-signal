@@ -554,7 +554,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5) * windScale
     velocity.current.x += crosswind * dt
     signalGusts.forEach((gust) => {
-      if (Math.abs(position.current.y - gust.y) < 4.2 && Math.hypot(position.current.x - gust.x, position.current.z - gust.z) < 3.4) velocity.current.x += gust.direction * gust.strength * windScale * dt
+      if (Math.abs(position.current.y - gust.y) < 4.2 && Math.hypot(position.current.x - gust.x, position.current.z - gust.z) < 3.4) { velocity.current.x += gust.direction * gust.strength * windScale * dt; cameraShake.current = Math.max(cameraShake.current, .025 + gust.strength * .003) }
     })
     if (grounded.current) {
       const supported = platforms.some((p) => { const platformX = platformXAt(p, state.clock.elapsedTime); return Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - platformX) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12 })
