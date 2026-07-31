@@ -254,6 +254,22 @@ function CheckpointBeacon({ position, mode }: { position: [number, number, numbe
   </group>
 }
 
+function SpawnPlaza({ mode }: { mode: RunMode }) {
+  const accent = mode === 'stormline' ? '#ff5966' : mode === 'zenith' ? '#8ddfff' : '#e4b849'
+  return <group position={[0, -.05, -8]}>
+    <mesh position={[-10, 1.7, 0]} castShadow><boxGeometry args={[3.5, 3.4, 4.2]} /><meshStandardMaterial color="#4a4541" metalness={.35} roughness={.7} /></mesh>
+    <mesh position={[10, 2.2, -1.5]} castShadow><boxGeometry args={[4.2, 4.4, 3.5]} /><meshStandardMaterial color="#38454a" metalness={.45} roughness={.6} /></mesh>
+    {[-10, 10].map((x) => <mesh key={x} position={[x, 3.5, 1.9]}><boxGeometry args={[2.4, .08, .05]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.8} /></mesh>)}
+    <group position={[0, 3.6, -2.2]}>
+      {[-6.5, 6.5].map((x) => <mesh key={x} position={[x, 0, 0]} castShadow><cylinderGeometry args={[.18, .22, 7.2, 8]} /><meshStandardMaterial color="#242a31" metalness={.8} roughness={.28} /></mesh>)}
+      <mesh position={[0, 3.5, 0]} castShadow><boxGeometry args={[13.4, .24, .26]} /><meshStandardMaterial color="#242a31" metalness={.8} roughness={.28} /></mesh>
+      <mesh position={[0, 2.3, .08]}><boxGeometry args={[3.8, .72, .08]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.5} transparent opacity={.86} /></mesh>
+    </group>
+    <mesh position={[0, .06, -4.8]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[12, 4]} /><meshStandardMaterial color="#20242b" metalness={.45} roughness={.58} /></mesh>
+    {[-2.3, 2.3].map((x) => <mesh key={x} position={[x, .2, -4.8]} rotation={[-Math.PI / 2, 0, 0]}><boxGeometry args={[.06, 3.4, .015]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.2} /></mesh>)}
+  </group>
+}
+
 function SignalGrid({ mode }: { mode: RunMode }) {
   const material = useRef<THREE.ShaderMaterial>(null)
   const color = mode === 'stormline' ? new THREE.Color('#ff5966') : mode === 'zenith' ? new THREE.Color('#8ddfff') : new THREE.Color('#dfb65f')
@@ -668,6 +684,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     {checkpointHeight > 0 && <CheckpointBeacon position={[platformXAt(checkpointPlatform, 0), checkpointPlatform.y + .34, checkpointPlatform.z]} mode={mode} />}
     <Environment preset="sunset" />
     <WorldBackdrop mode={mode} mutator={mutator} />
+    <SpawnPlaza mode={mode} />
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
     <Sparkles count={85 + Math.floor(heat / 10) * 8} scale={[28, 30, 25]} size={2.5 + heat / 70} speed={.22 + heat / 180} color={heat > 70 ? '#ff9a67' : '#fff0bf'} />
     <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
