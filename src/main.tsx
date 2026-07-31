@@ -108,13 +108,8 @@ const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms, ...sid
 const courseHeight = platforms[platforms.length - 1].y + 1.2
 const platformXAt = (platform: Platform, time: number) => platform.x + (platform.sway ? Math.sin(time * 1.15 + platform.y * .23) * platform.sway : 0)
 
-const signalShards: SignalShard[] = [
-  { x: -2.8, y: 3.75, z: -1.3 },
-  { x: 1.4, y: 6.05, z: -3.1 },
-  { x: 0.6, y: 11.2, z: -5.6 },
-  { x: -0.9, y: 16.9, z: -8.1 },
-  { x: 0, y: 22.6, z: -10.8 },
-]
+const signalShardAnchors = [starterPlatforms[1], extendedPlatforms[12], extendedPlatforms[30], extendedPlatforms[49], extendedPlatforms[64]]
+const signalShards: SignalShard[] = signalShardAnchors.map((platform) => ({ x: platform.x, y: platform.y + .58, z: platform.z }))
 
 const signalGates: SignalGate[] = Array.from({ length: 8 }, (_, index) => ({
   x: Math.sin(index * 1.8) * 1.4,
