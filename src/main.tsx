@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Float, Html, Sparkles, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import './styles.css'
@@ -262,6 +262,21 @@ function SignalGrid({ mode }: { mode: RunMode }) {
     <planeGeometry args={[360, 360, 1, 1]} />
     <shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uColor: { value: color } }} vertexShader={'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }'} fragmentShader={'uniform float uTime; uniform vec3 uColor; varying vec2 vUv; void main(){ vec2 cell=abs(fract(vUv*34.0)-.5); float lines=max(step(.475,cell.x),step(.475,cell.y)); float sweep=1.0-smoothstep(.0,.16,abs(fract(vUv.y+uTime*.018)-.5)); float edge=1.0-smoothstep(.15,.9,distance(vUv,vec2(.5))); float alpha=(lines*.13+sweep*.035)*edge; gl_FragColor=vec4(uColor,alpha); }'} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
   </mesh>
+}
+
+function AtmosphereController({ heat, mutator }: { heat: number; mutator: DailyMutator }) {
+  const { scene } = useThree()
+  useFrame((state, delta) => {
+    const fog = scene.fog
+    if (!(fog instanceof THREE.Fog)) return
+    const blackout = mutator === 'blackout'
+    const targetNear = (blackout ? 24 : 34) - Math.min(8, heat * .04)
+    const targetFar = (blackout ? 125 : 190) - Math.min(24, heat * .12)
+    fog.near = THREE.MathUtils.damp(fog.near, targetNear, 2.4, delta)
+    fog.far = THREE.MathUtils.damp(fog.far, targetFar, 2.4, delta)
+    if (state.clock.elapsedTime % 1 < .01) scene.fog = fog
+  })
+  return null
 }
 
 function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator }) {
@@ -644,6 +659,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={[palette.sky]} />
     <fog attach="fog" args={[palette.fog, 34, 190]} />
+    <AtmosphereController heat={heat} mutator={mutator} />
     <ambientLight intensity={1.55} color={palette.ambient} />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
