@@ -185,7 +185,7 @@ function App() {
     <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
-    <section className="route"><span>ROUTE 01 / CLOUDLINE</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
+    <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!running && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Miss once, learn fast, go again. Collect the red signal shards to complete the route.</p><button onClick={() => setRunning(true)}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={() => setRunning(false)}>PAUSE</button>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
