@@ -50,8 +50,8 @@ function Player({ running, onProgress, onFall }: { running: boolean; onProgress:
   useFrame((state, delta) => {
     if (!body.current || !running) return
     const dt = Math.min(delta, .04)
-    const steer = (Number(keys.current.d || keys.current.arrowright) - Number(keys.current.a || keys.current.arrowleft))
-    const pace = (Number(keys.current.w || keys.current.arrowup) - Number(keys.current.s || keys.current.arrowdown))
+    const steer = (Number(Boolean(keys.current.d || keys.current.arrowright)) - Number(Boolean(keys.current.a || keys.current.arrowleft)))
+    const pace = (Number(Boolean(keys.current.w || keys.current.arrowup)) - Number(Boolean(keys.current.s || keys.current.arrowdown)))
     velocity.current.x = THREE.MathUtils.damp(velocity.current.x, steer * 5.1, 10, dt)
     velocity.current.z = THREE.MathUtils.damp(velocity.current.z, pace * 2.4 - 1.7, 7, dt)
     velocity.current.y -= 13.8 * dt
