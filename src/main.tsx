@@ -194,10 +194,13 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArt
   const completedRun = useRef(false)
   const burstCooldown = useRef(0)
   const burstLatch = useRef(false)
+  const jumpLatch = useRef(false)
+  const coyoteTimer = useRef(0)
+  const jumpBufferTimer = useRef(0)
   const runClock = useRef(0)
   const nextGhostSample = useRef(0)
   const checkpoint = useRef(new THREE.Vector3(0, .34, 0))
-  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false }
+  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
@@ -238,6 +241,8 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArt
     const pace = (Number(Boolean(keys.current.w || keys.current.arrowup || keys.current.keyw)) - Number(Boolean(keys.current.s || keys.current.arrowdown || keys.current.keys)))
     const wantsJump = Boolean(keys.current[' '] || keys.current.space || keys.current.spacebar)
     const wantsBurst = Boolean(keys.current.shift || keys.current.shiftleft || keys.current.shiftright)
+    if (!wantsJump) { jumpLatch.current = false; jumpBufferTimer.current = 0 } else if (!jumpLatch.current) jumpBufferTimer.current = .12
+    coyoteTimer.current = grounded.current ? .12 : Math.max(0, coyoteTimer.current - dt)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
     const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
     const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
@@ -263,7 +268,8 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArt
       const supported = platforms.some((p) => { const platformX = platformXAt(p, state.clock.elapsedTime); return Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - platformX) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12 })
       if (!supported) { grounded.current = false; velocity.current.y = -.6 }
     }
-    if (wantsJump && grounded.current) { velocity.current.y = 9.6; grounded.current = false }
+    jumpBufferTimer.current = Math.max(0, jumpBufferTimer.current - dt)
+    if (jumpBufferTimer.current > 0 && coyoteTimer.current > 0 && !jumpLatch.current) { velocity.current.y = 9.6; grounded.current = false; jumpLatch.current = true; coyoteTimer.current = 0; jumpBufferTimer.current = 0 }
     if (!grounded.current) velocity.current.y -= (mode === 'stormline' ? 14.8 : mode === 'zenith' ? 13.2 : 13.8) * modifiers.gravityMultiplier * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
@@ -451,7 +457,7 @@ function App() {
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SHIFT BURST · MOUSE LOOK</small></section>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · SHIFT BURST · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · CACHE {artifactHits.size}/6</small></p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
