@@ -13,6 +13,7 @@ type SignalArtifact = { x: number; y: number; z: number; label: string }
 type SignalHunter = { x: number; y: number; z: number; orbit: number; phase: number }
 type SignalGust = { x: number; y: number; z: number; direction: number; strength: number }
 type GhostFrame = { t: number; x: number; y: number; z: number }
+type RunRecord = { time: number; grade: string; mode: string; mutator: string; date: string }
 type DailyMutator = 'redline' | 'low-gravity' | 'blackout'
 const dailyMutator: DailyMutator = (['redline', 'low-gravity', 'blackout'] as DailyMutator[])[new Date().getDate() % 3]
 const dailyMutatorLabel = dailyMutator === 'redline' ? 'REDLINE DAY' : dailyMutator === 'low-gravity' ? 'LOW-G DAY' : 'BLACKOUT DAY'
@@ -670,6 +671,9 @@ function App() {
   const [cameraMode, setCameraMode] = useState<'third' | 'first'>('third')
   const [runGrade, setRunGrade] = useState('C')
   const [soundOn, setSoundOn] = useState(true)
+  const [runHistory, setRunHistory] = useState<RunRecord[]>(() => {
+    try { return JSON.parse(localStorage.getItem('summit-signal-history') || '[]') as RunRecord[] } catch { return [] }
+  })
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const flowMultiplier = 1 + Math.min(2, Math.floor(combo / 5) * .25)
   const biome = getBiome(height, courseHeight)
@@ -701,6 +705,8 @@ function App() {
     setFinalTime(time)
     const gradeScore = gateHits.size * 2 + artifactHits.size + (combo >= 10 ? 2 : 0) + (falls === 0 ? 1 : 0)
     setRunGrade(gradeScore >= 10 ? 'S' : gradeScore >= 7 ? 'A' : gradeScore >= 4 ? 'B' : 'C')
+    const grade = gradeScore >= 10 ? 'S' : gradeScore >= 7 ? 'A' : gradeScore >= 4 ? 'B' : 'C'
+    setRunHistory(current => { const next = [{ time, grade, mode: modeLabel, mutator: dailyMutatorLabel, date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }, ...current].slice(0, 5); localStorage.setItem('summit-signal-history', JSON.stringify(next)); return next })
     setCompleted(true)
     setRunning(false)
     if (recording.current.length > 1) { setGhostPath(recording.current); localStorage.setItem('summit-signal-echo', JSON.stringify(recording.current)) }
@@ -751,7 +757,7 @@ function App() {
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><div className="daily-card">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · E GRAPPLE · SHIFT BURST · Q PHASE · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && pendingCards.length === 0 && <section className="pause-panel"><div className="eyebrow">RUN PAUSED · {modeLabel}</div><h2>HOLD<br /><i>THE LINE.</i></h2><p>Checkpoint anchor <strong>{Math.floor(checkpointHeight * 10)}M</strong><br />Run code <strong>{challengeCode}</strong></p><button onClick={resumeRun}>RESUME RUN <span>↗</span></button><small>R RESET RUN · C RECENTER · V CHANGE VIEW</small></section>}
-    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · AIR GATES {airGateHits} · CACHE {artifactHits.size}/6 · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
+    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · AIR GATES {airGateHits} · CACHE {artifactHits.size}/6 · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><div className="run-history"><span>RECENT ASCENTS</span>{runHistory.slice(0, 3).map((run, index) => <div key={`${run.date}-${index}`}><b>{run.grade}</b><strong>{formatTime(run.time)}</strong><small>{run.mode} · {run.mutator}</small></div>)}</div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
