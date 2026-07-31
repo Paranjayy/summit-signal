@@ -419,6 +419,7 @@ const drawCards = (seed: number) => CARD_POOL.map((_, index) => CARD_POOL[(seed 
 
 function App() {
   const audio = useRef<AudioContext | null>(null)
+  const muted = useRef(false)
   const recording = useRef<GhostFrame[]>([])
   const [running, setRunning] = useState(false)
   const [height, setHeight] = useState(0)
@@ -451,10 +452,12 @@ function App() {
   const [runId, setRunId] = useState(0)
   const [cameraMode, setCameraMode] = useState<'third' | 'first'>('third')
   const [runGrade, setRunGrade] = useState('C')
+  const [soundOn, setSoundOn] = useState(true)
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const biome = getBiome(height, courseHeight)
   const modeLabel = getModeLabel(mode)
   const challengeCode = `SS-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${modeLabel.slice(0, 3)}`
+  const cue = (name: AudioCue) => { if (!muted.current) playCue(audio.current, name) }
   const nextPlatform = platforms.find(platform => platform.y > height + .9) ?? platforms[platforms.length - 1]
   const radarX = THREE.MathUtils.clamp(50 + nextPlatform.x * 8, 10, 90)
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
@@ -479,7 +482,7 @@ function App() {
     setCompleted(true)
     setRunning(false)
     if (recording.current.length > 1) { setGhostPath(recording.current); localStorage.setItem('summit-signal-echo', JSON.stringify(recording.current)) }
-    playCue(audio.current, 'finish')
+    cue('finish')
     if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
   const chooseCard = (card: SignalCard) => { setActiveCards(current => [...current, card]); setModifiers(current => mergeModifiers(current, card)); setPendingCards([]); setRunning(true); setSignalFlash(`${card.title} ONLINE · KEEP CLIMBING`) }
@@ -490,15 +493,16 @@ function App() {
     return () => removeEventListener('keydown', chooseWithKey)
   }, [pendingCards])
   const handleFall = () => {
-    if (modifiers.anchorCharges > 0) { setModifiers(current => ({ ...current, anchorCharges: current.anchorCharges - 1 })); setHeat(0); setSignalFlash('ANCHOR SPENT · FALL FORGIVEN'); playCue(audio.current, 'checkpoint'); return true }
-    setFalls(v => v + 1); setCombo(0); setHeat(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); playCue(audio.current, 'fail'); return false
+    if (modifiers.anchorCharges > 0) { setModifiers(current => ({ ...current, anchorCharges: current.anchorCharges - 1 })); setHeat(0); setSignalFlash('ANCHOR SPENT · FALL FORGIVEN'); cue('checkpoint'); return true }
+    setFalls(v => v + 1); setCombo(0); setHeat(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); cue('fail'); return false
   }
-  const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setHeat(current => Math.min(100, current + 10)); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false); playCue(audio.current, 'checkpoint') }
-  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setHeat(current => Math.min(100, current + 22)); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`); playCue(audio.current, 'gate') }
-  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · +2 STREAK`); playCue(audio.current, 'shard') }
+  const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setHeat(current => Math.min(100, current + 10)); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false); cue('checkpoint') }
+  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setHeat(current => Math.min(100, current + 22)); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`); cue('gate') }
+  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · +2 STREAK`); cue('shard') }
+  const toggleSound = () => { setSoundOn(current => { muted.current = current; return !current }) }
   const copyChallengeCode = () => { void navigator.clipboard?.writeText(challengeCode); setSignalFlash(`RUN CODE COPIED · ${challengeCode}`) }
   return <main className={heat > 70 ? 'heat-hot' : ''}>
-    <World running={running} mode={mode} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); playCue(audio.current, 'shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { playCue(audio.current, 'land'); setHeat(current => Math.min(100, current + 5)); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); playCue(audio.current, 'burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); playCue(audio.current, 'burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onComplete={completeRun} />
+    <World running={running} mode={mode} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); cue('shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={() => { cue('land'); setHeat(current => Math.min(100, current + 5)); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); cue('burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); cue('burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
@@ -523,6 +527,7 @@ function App() {
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
     {running && <div className="camera-hint">C / RECENTER · V / {cameraMode === 'third' ? 'FIRST PERSON' : 'CHASE CAM'}</div>}
+    <button className="sound-toggle" onClick={toggleSound} aria-label={soundOn ? 'Mute signal audio' : 'Enable signal audio'}>{soundOn ? 'AUDIO ON' : 'AUDIO OFF'}</button>
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
 }
