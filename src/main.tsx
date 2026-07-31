@@ -468,6 +468,8 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     const up = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = false; keys.current[code] = false }
     const clearKeys = () => { keys.current = {} }
     const canvas = document.querySelector('canvas')
+    const touchDown = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = true; event.preventDefault() } }
+    const touchUp = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = false; event.preventDefault() } }
     const handlePointerDown = (event: PointerEvent) => { dragging.current = true; previousPointer.current = { x: event.clientX, y: event.clientY }; if (document.pointerLockElement !== canvas) canvas?.requestPointerLock?.() }
     const handlePointerUp = () => { dragging.current = false }
     const handleMouseMove = (event: MouseEvent) => {
@@ -478,8 +480,8 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
       yaw.current -= dx * .0026
       pitch.current = THREE.MathUtils.clamp(pitch.current - dy * .0022, -.5, .72)
     }
-    addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clearKeys); addEventListener('visibilitychange', clearKeys); canvas?.addEventListener('pointerdown', handlePointerDown); addEventListener('pointerup', handlePointerUp); addEventListener('mousemove', handleMouseMove)
-    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up); removeEventListener('blur', clearKeys); removeEventListener('visibilitychange', clearKeys); canvas?.removeEventListener('pointerdown', handlePointerDown); removeEventListener('pointerup', handlePointerUp); removeEventListener('mousemove', handleMouseMove) }
+    addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clearKeys); addEventListener('visibilitychange', clearKeys); addEventListener('pointerdown', touchDown); addEventListener('pointerup', touchUp); addEventListener('pointercancel', touchUp); canvas?.addEventListener('pointerdown', handlePointerDown); addEventListener('pointerup', handlePointerUp); addEventListener('mousemove', handleMouseMove)
+    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up); removeEventListener('blur', clearKeys); removeEventListener('visibilitychange', clearKeys); removeEventListener('pointerdown', touchDown); removeEventListener('pointerup', touchUp); removeEventListener('pointercancel', touchUp); canvas?.removeEventListener('pointerdown', handlePointerDown); removeEventListener('pointerup', handlePointerUp); removeEventListener('mousemove', handleMouseMove) }
   }, [onViewChange])
 
   useEffect(() => {
@@ -850,6 +852,7 @@ function App() {
     {running && <div className="gust-hunt">GUST WALLS <strong>3</strong><small>READ THE ARROWS</small></div>}
     {running && <section className="heat-meter" aria-label="Momentum heat"><span>FLOW HEAT</span><strong>{Math.round(heat)}%</strong><div><i style={{ width: `${heat}%` }} /></div><small>{heat > 70 ? 'OVERDRIVE' : 'KEEP THE LINE'}</small></section>}
     {running && <section className="route-radar" aria-label="Next ledge radar"><span>NEXT LEDGE</span><strong>{Math.floor(nextPlatform.y * 10)}M · {nextPlatform.kind.toUpperCase()}</strong><div><i style={{ left: `${radarX}%` }} /></div><small>{nextPlatform.x > .5 ? 'STEER RIGHT' : nextPlatform.x < -.5 ? 'STEER LEFT' : 'CENTER LINE'}</small></section>}
+    {running && <div className="touch-controls" aria-label="Touch controls"><div className="touch-dpad"><button data-game-key="a" aria-label="Move left">◀</button><button data-game-key="w" aria-label="Move forward">▲</button><button data-game-key="d" aria-label="Move right">▶</button></div><div className="touch-actions"><button data-game-key=" " aria-label="Jump">JUMP</button><button data-game-key="shift" aria-label="Signal burst">BURST</button><button data-game-key="e" aria-label="Grapple">GRAPPLE</button><button data-game-key="q" aria-label="Phase shift">PHASE</button></div></div>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
