@@ -13,6 +13,9 @@ type SignalArtifact = { x: number; y: number; z: number; label: string }
 type SignalHunter = { x: number; y: number; z: number; orbit: number; phase: number }
 type SignalGust = { x: number; y: number; z: number; direction: number; strength: number }
 type GhostFrame = { t: number; x: number; y: number; z: number }
+type DailyMutator = 'redline' | 'low-gravity' | 'blackout'
+const dailyMutator: DailyMutator = (['redline', 'low-gravity', 'blackout'] as DailyMutator[])[new Date().getDate() % 3]
+const dailyMutatorLabel = dailyMutator === 'redline' ? 'REDLINE DAY' : dailyMutator === 'low-gravity' ? 'LOW-G DAY' : 'BLACKOUT DAY'
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
   const remainder = Math.floor(seconds % 60).toString().padStart(2, '0')
@@ -238,10 +241,10 @@ function GustWall({ gust, mode }: { gust: SignalGust; mode: RunMode }) {
   </group>
 }
 
-function WorldBackdrop({ mode }: { mode: RunMode }) {
+function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
-  const sunColor = stormline ? '#ef6c4d' : zenith ? '#b9dcff' : '#f1c171'
+  const sunColor = mutator === 'blackout' ? '#4f4c76' : stormline ? '#ef6c4d' : zenith ? '#b9dcff' : '#f1c171'
   const skylineColor = stormline ? '#26343d' : zenith ? '#40566b' : '#313d42'
   const skyline = useMemo(() => Array.from({ length: 14 }, (_, index) => ({ x: (index % 2 ? 1 : -1) * (16 + (index % 5) * 4), y: 7 + (index % 4) * 3.5, z: -18 - index * 6, width: 2.5 + (index % 3) * 1.3, depth: 2.2 + (index % 2), height: 12 + (index % 5) * 5 })), [])
   const billboards = useMemo(() => [
@@ -260,7 +263,7 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
     <DistrictPulse y={41} z={-38} color={zenith ? '#8ce7ff' : '#58e4dc'} />
     <DistrictPulse y={64} z={-63} color={stormline ? '#ff5362' : '#c77dff'} />
     <DistrictPulse y={87} z={-88} color={zenith ? '#8ce7ff' : '#ff794d'} />
-    <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={.5} roughness={1} /></mesh>
+    <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={mutator === 'blackout' ? '#26243d' : stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={mutator === 'blackout' ? .18 : .5} roughness={1} /></mesh>
     {skyline.map((tower, index) => <group key={`tower-${index}`} position={[tower.x, tower.y, tower.z]}>
       <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? skylineColor : (stormline ? '#3e4047' : zenith ? '#52687a' : '#46504c')} roughness={.85} metalness={.3} /></mesh>
       <mesh position={[0, tower.height / 2 + 1.5, 0]}><cylinderGeometry args={[.05, .05, 3, 6]} /><meshStandardMaterial color="#d7ad47" emissive="#d7ad47" emissiveIntensity={.7} /></mesh>
@@ -345,7 +348,7 @@ function SummitBeacon({ active }: { active: boolean }) {
   </group>
 }
 
-function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
+function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; mode: RunMode; mutator: DailyMutator; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const grappleBeam = useRef<THREE.Mesh>(null)
   const phaseShell = useRef<THREE.Mesh>(null)
@@ -429,8 +432,9 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     if (!wantsJump) { jumpLatch.current = false; jumpBufferTimer.current = 0 } else if (!jumpLatch.current) jumpBufferTimer.current = .12
     coyoteTimer.current = grounded.current ? .12 : Math.max(0, coyoteTimer.current - dt)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
-    const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
-    const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
+    const dailySpeed = mutator === 'redline' ? 1.1 : 1
+    const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
+    const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
     burstCooldown.current = Math.max(0, burstCooldown.current - dt)
@@ -488,7 +492,8 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     }
     jumpBufferTimer.current = Math.max(0, jumpBufferTimer.current - dt)
     if (jumpBufferTimer.current > 0 && coyoteTimer.current > 0 && !jumpLatch.current) { velocity.current.y = 9.6; grounded.current = false; jumpLatch.current = true; coyoteTimer.current = 0; jumpBufferTimer.current = 0 }
-    if (!grounded.current) velocity.current.y -= (mode === 'stormline' ? 14.8 : mode === 'zenith' ? 13.2 : 13.8) * modifiers.gravityMultiplier * dt
+    const dailyGravity = mutator === 'low-gravity' ? .78 : 1
+    if (!grounded.current) velocity.current.y -= (mode === 'stormline' ? 14.8 : mode === 'zenith' ? 13.2 : 13.8) * modifiers.gravityMultiplier * dailyGravity * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
     if (!grounded.current && velocity.current.y < 0) {
@@ -593,11 +598,11 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   </group>
 }
 
-function World({ running, completed, mode, modifiers, biome, heat, ghostPath, runId, onProgress, onFall, collectedShards, collectedArtifacts, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; completed: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; heat: number; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; collectedArtifacts: Set<number>; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
+function World({ running, completed, mode, mutator, modifiers, biome, heat, ghostPath, runId, onProgress, onFall, collectedShards, collectedArtifacts, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; completed: boolean; mode: RunMode; mutator: DailyMutator; modifiers: RunModifiers; biome: BiomeId; heat: number; ghostPath: GhostFrame[]; runId: number; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; collectedArtifacts: Set<number>; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   const biomePalette = biome === 'neon-underpass' ? { sky: '#9b9bb6', fog: '#545775', ambient: '#d6d8f2', ground: '#313743' } : biome === 'cloud-cathedral' ? { sky: '#c9d8df', fog: '#a4b9c1', ambient: '#eff7ff', ground: '#61727a' } : biome === 'signal-core' ? { sky: '#e4c9b5', fog: '#b98172', ambient: '#ffe6c7', ground: '#3a2928' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
   const contractTint = mode === 'stormline' ? { sky: '#879a9a', fog: '#667b7b', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : biomePalette
-  const palette = biome === 'rust-yard' ? contractTint : biomePalette
+  const palette = mutator === 'blackout' ? { sky: '#2b2c40', fog: '#27283a', ambient: '#8b8cae', ground: '#242532' } : biome === 'rust-yard' ? contractTint : biomePalette
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={[palette.sky]} />
     <fog attach="fog" args={[palette.fog, 34, 190]} />
@@ -607,7 +612,7 @@ function World({ running, completed, mode, modifiers, biome, heat, ghostPath, ru
     <StormFlash active={mode === 'stormline' || heat > 88} />
     <SummitBeacon active={completed} />
     <Environment preset="sunset" />
-    <WorldBackdrop mode={mode} />
+    <WorldBackdrop mode={mode} mutator={mutator} />
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
     <Sparkles count={85 + Math.floor(heat / 10) * 8} scale={[28, 30, 25]} size={2.5 + heat / 70} speed={.22 + heat / 180} color={heat > 70 ? '#ff9a67' : '#fff0bf'} />
     <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
@@ -618,7 +623,7 @@ function World({ running, completed, mode, modifiers, biome, heat, ghostPath, ru
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
-    <Player running={running} mode={mode} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
+    <Player running={running} mode={mode} mutator={mutator} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -717,7 +722,7 @@ function App() {
   const toggleSound = () => { setSoundOn(current => { muted.current = current; return !current }) }
   const copyChallengeCode = () => { void navigator.clipboard?.writeText(challengeCode); setSignalFlash(`RUN CODE COPIED · ${challengeCode}`) }
   return <main className={heat > 70 ? 'heat-hot' : ''}>
-    <World running={running} completed={completed} mode={mode} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); cue('shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={(perfect, shortcut) => { cue('land'); setHeat(current => Math.min(100, current + (perfect ? 14 : 5) + (shortcut ? 8 : 0))); setCombo(current => { const next = current + (perfect ? 2 : 1) + (shortcut ? 1 : 0); if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }); if (shortcut) { setShortcutLands(current => current + 1); setStartedAt(current => current - 300); setSignalFlash('SHORTCUT LINE · -0.3S'); cue('gate') } else if (perfect) { setPerfectLands(current => current + 1); setStartedAt(current => current - 420); setSignalFlash('PERFECT LANDING · -0.4S'); cue('gate') } }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); cue('burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); cue('burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onHunterHit={() => { setHeat(0); setSignalFlash('SIGNAL HUNTER CONTACT · RETURNING TO CHECKPOINT'); cue('fail') }} onPhase={() => { setPhaseReady(false); setHeat(current => Math.min(100, current + 10)); setSignalFlash('PHASE SHIFT · HUNTERS BLIND'); cue('burst'); window.setTimeout(() => setPhaseReady(true), 7000) }} onComplete={completeRun} />
+    <World running={running} completed={completed} mode={mode} mutator={dailyMutator} modifiers={modifiers} biome={biome} heat={heat} ghostPath={ghostPath} runId={runId} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} collectedArtifacts={artifactHits} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setHeat(current => Math.min(100, current + 8)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); cue('shard') }} onArtifact={handleArtifact} onGate={handleGate} onGhostFrame={(frame) => { if (recording.current.length < 6000) recording.current.push(frame) }} onLand={(perfect, shortcut) => { cue('land'); setHeat(current => Math.min(100, current + (perfect ? 14 : 5) + (shortcut ? 8 : 0))); setCombo(current => { const next = current + (perfect ? 2 : 1) + (shortcut ? 1 : 0); if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }); if (shortcut) { setShortcutLands(current => current + 1); setStartedAt(current => current - 300); setSignalFlash('SHORTCUT LINE · -0.3S'); cue('gate') } else if (perfect) { setPerfectLands(current => current + 1); setStartedAt(current => current - 420); setSignalFlash('PERFECT LANDING · -0.4S'); cue('gate') } }} onBurst={() => { setBurstReady(false); setHeat(current => Math.min(100, current + 4)); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); cue('burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onGrapple={() => { setGrappleReady(false); setHeat(current => Math.min(100, current + 6)); setSignalFlash('GRAPPLE LINE · NEXT LEDGE ACQUIRED'); cue('burst'); window.setTimeout(() => setGrappleReady(true), 5000) }} onCheckpoint={handleCheckpoint} onViewChange={setCameraMode} onHunterHit={() => { setHeat(0); setSignalFlash('SIGNAL HUNTER CONTACT · RETURNING TO CHECKPOINT'); cue('fail') }} onPhase={() => { setPhaseReady(false); setHeat(current => Math.min(100, current + 10)); setSignalFlash('PHASE SHIFT · HUNTERS BLIND'); cue('burst'); window.setTimeout(() => setPhaseReady(true), 7000) }} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
@@ -729,6 +734,7 @@ function App() {
     {running && <section className={`phase ${phaseReady ? 'ready' : ''}`} aria-label="Phase shift"><span>PHASE SHIFT</span><strong>{phaseReady ? 'READY' : 'RECHARGING'}</strong><small>Q · GHOST HUNTERS</small></section>}
     {running && ghostPath.length > 1 && <div className="echo-badge">ECHO <strong>PB GHOST</strong><small>CHASE YOUR LINE</small></div>}
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
+    {running && <div className="daily-mutator">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong><small>RULESET ROTATES AT MIDNIGHT</small></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
     {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/6</strong><small>FIND THE KEYS</small></div>}
@@ -739,7 +745,7 @@ function App() {
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · E GRAPPLE · SHIFT BURST · MOUSE LOOK · V VIEW</small></section>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><div className="daily-card">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · E GRAPPLE · SHIFT BURST · Q PHASE · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && pendingCards.length === 0 && <section className="pause-panel"><div className="eyebrow">RUN PAUSED · {modeLabel}</div><h2>HOLD<br /><i>THE LINE.</i></h2><p>Checkpoint anchor <strong>{Math.floor(checkpointHeight * 10)}M</strong><br />Run code <strong>{challengeCode}</strong></p><button onClick={resumeRun}>RESUME RUN <span>↗</span></button><small>R RESET RUN · C RECENTER · V CHANGE VIEW</small></section>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · CACHE {artifactHits.size}/6 · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
