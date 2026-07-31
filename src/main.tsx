@@ -67,10 +67,10 @@ const starterPlatforms: Platform[] = [
   { x: 0, y: 21.5, z: -10.8, width: 4.8, depth: 3.5, kind: 'cloud' },
 ]
 
-const extendedPlatforms: Platform[] = Array.from({ length: 30 }, (_, index) => {
-  const y = 23.9 + index * 2.55
-  const x = Math.sin(index * 1.47) * 4.2
-  const z = -12.1 - index * 1.45
+const extendedPlatforms: Platform[] = Array.from({ length: 72 }, (_, index) => {
+  const y = 23.9 + index * 2.75
+  const x = Math.sin(index * 1.47) * (3.8 + (index % 9 === 0 ? 1.1 : 0))
+  const z = -12.1 - index * 1.72
   const kinds: Platform['kind'][] = ['scaffold', 'container', 'sign', 'cloud', 'moving']
   const kind = kinds[index % kinds.length]
   return { x, y, z, width: 3.1 + (index % 3) * .45, depth: 2.7 + (index % 2) * .45, kind, sway: kind === 'moving' ? (index % 2 ? 1.45 : -1.45) : undefined }
@@ -87,7 +87,13 @@ const sideRoutePlatforms: Platform[] = [
   { x: 7.2, y: 60.3, z: -51.1, width: 2.4, depth: 2.1, kind: 'sign' },
 ]
 
-const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms, ...sideRoutePlatforms].sort((a, b) => a.y - b.y)
+const upperSideRoutePlatforms: Platform[] = Array.from({ length: 12 }, (_, index) => {
+  const side = index % 2 ? 1 : -1
+  const y = 68.5 + index * 11.8
+  return { x: side * (6.6 + (index % 3) * .35), y, z: -59 - index * 12.2, width: 2.35 + (index % 2) * .2, depth: 2.05, kind: index % 3 === 1 ? 'moving' : index % 3 === 2 ? 'sign' : 'scaffold', sway: index % 3 === 1 ? side * 1.25 : undefined }
+})
+
+const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms, ...sideRoutePlatforms, ...upperSideRoutePlatforms].sort((a, b) => a.y - b.y)
 const courseHeight = platforms[platforms.length - 1].y + 1.2
 const platformXAt = (platform: Platform, time: number) => platform.x + (platform.sway ? Math.sin(time * 1.15 + platform.y * .23) * platform.sway : 0)
 
@@ -99,34 +105,35 @@ const signalShards: SignalShard[] = [
   { x: 0, y: 22.6, z: -10.8 },
 ]
 
-const signalGates: SignalGate[] = [
-  { x: 0, y: 18, z: -13, radius: 5.5 },
-  { x: 0, y: 41, z: -38, radius: 5.8 },
-  { x: 0, y: 64, z: -63, radius: 6.1 },
-  { x: 0, y: 87, z: -88, radius: 6.4 },
-]
+const signalGates: SignalGate[] = Array.from({ length: 8 }, (_, index) => ({
+  x: Math.sin(index * 1.8) * 1.4,
+  y: 18 + index * 27.8,
+  z: -13 - index * 29,
+  radius: 5.5 + index * .16,
+}))
 
-const signalArtifacts: SignalArtifact[] = [
-  { x: 4.2, y: 26.7, z: -13.6, label: 'RUST KEY' },
-  { x: -4.2, y: 39.4, z: -20.8, label: 'NIGHT KEY' },
-  { x: 4.4, y: 52.2, z: -28.1, label: 'CLOUD KEY' },
-  { x: -4.3, y: 65, z: -35.4, label: 'VOID KEY' },
-  { x: 4.1, y: 77.8, z: -42.7, label: 'SUN KEY' },
-  { x: -3.7, y: 90.6, z: -49.9, label: 'CORE KEY' },
-]
+const signalArtifacts: SignalArtifact[] = Array.from({ length: 12 }, (_, index) => ({
+  x: (index % 2 ? -1 : 1) * (3.8 + (index % 3) * .35),
+  y: 26.7 + index * 16.3,
+  z: -13.6 - index * 10.9,
+  label: ['RUST KEY', 'NIGHT KEY', 'CLOUD KEY', 'VOID KEY', 'SUN KEY', 'CORE KEY'][index % 6],
+}))
 
-const signalHunters: SignalHunter[] = [
-  { x: 0, y: 29, z: -16.5, orbit: 2.8, phase: .2 },
-  { x: 0, y: 47, z: -40, orbit: 3.2, phase: 2.1 },
-  { x: 0, y: 68, z: -66, orbit: 3.6, phase: 4.4 },
-  { x: 0, y: 87.5, z: -91, orbit: 4.1, phase: 1.4 },
-]
+const signalHunters: SignalHunter[] = Array.from({ length: 9 }, (_, index) => ({
+  x: Math.sin(index * 1.3) * 1.2,
+  y: 31 + index * 23.4,
+  z: -18 - index * 24.3,
+  orbit: 2.8 + (index % 4) * .45,
+  phase: index * 1.9,
+}))
 
-const signalGusts: SignalGust[] = [
-  { x: -1, y: 36, z: -24, direction: 1, strength: 3.8 },
-  { x: 1.5, y: 58, z: -51, direction: -1, strength: 4.4 },
-  { x: -1.2, y: 77, z: -73, direction: 1, strength: 5.1 },
-]
+const signalGusts: SignalGust[] = Array.from({ length: 8 }, (_, index) => ({
+  x: index % 2 ? 1.5 : -1,
+  y: 36 + index * 24.2,
+  z: -24 - index * 25.5,
+  direction: index % 2 ? -1 : 1,
+  strength: 3.8 + index * .22,
+}))
 
 const hunterPosition = (hunter: SignalHunter, time: number, target = new THREE.Vector3()) => {
   const angle = time * 1.25 + hunter.phase
@@ -270,6 +277,25 @@ function SpawnPlaza({ mode }: { mode: RunMode }) {
   </group>
 }
 
+function CitySpire({ position, height, color, accent, phase }: { position: [number, number, number]; height: number; color: string; accent: string; phase: number }) {
+  const ring = useRef<THREE.Group>(null)
+  useFrame((state) => {
+    if (!ring.current) return
+    ring.current.rotation.y = state.clock.elapsedTime * (.22 + phase * .01)
+    ring.current.position.y = Math.sin(state.clock.elapsedTime * .45 + phase) * .16
+  })
+  const windows = Array.from({ length: 5 }, (_, index) => index)
+  return <group position={position}>
+    <mesh castShadow position={[0, height / 2, 0]}><cylinderGeometry args={[1.45, 2.1, height, 6]} /><meshStandardMaterial color={color} metalness={.72} roughness={.35} /></mesh>
+    <mesh position={[0, height + .35, 0]}><cylinderGeometry args={[.06, .12, 3.8, 6]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.6} /></mesh>
+    <group ref={ring} position={[0, height * .58, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[2.2, .045, 8, 32]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.8} transparent opacity={.7} depthWrite={false} /></mesh>
+      <mesh rotation={[Math.PI / 2, .4, 0]}><torusGeometry args={[2.75, .025, 8, 32]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.1} transparent opacity={.4} depthWrite={false} /></mesh>
+    </group>
+    {windows.map((index) => <mesh key={index} position={[0, 2 + index * (height - 4) / 4, 2.02]} rotation={[0, 0, index % 2 ? .03 : -.03]}><boxGeometry args={[1.25, .08, .035]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.5} transparent opacity={.72} /></mesh>)}
+  </group>
+}
+
 function SignalGrid({ mode }: { mode: RunMode }) {
   const material = useRef<THREE.ShaderMaterial>(null)
   const color = mode === 'stormline' ? new THREE.Color('#ff5966') : mode === 'zenith' ? new THREE.Color('#8ddfff') : new THREE.Color('#dfb65f')
@@ -320,24 +346,28 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
   const zenith = mode === 'zenith'
   const sunColor = mutator === 'blackout' ? '#4f4c76' : stormline ? '#ef6c4d' : zenith ? '#b9dcff' : '#f1c171'
   const skylineColor = stormline ? '#26343d' : zenith ? '#40566b' : '#313d42'
-  const skyline = useMemo(() => Array.from({ length: 14 }, (_, index) => ({ x: (index % 2 ? 1 : -1) * (16 + (index % 5) * 4), y: 7 + (index % 4) * 3.5, z: -18 - index * 6, width: 2.5 + (index % 3) * 1.3, depth: 2.2 + (index % 2), height: 12 + (index % 5) * 5 })), [])
-  const billboards = useMemo(() => [
-    { x: -13, y: 18, z: -26, color: '#58e4dc', label: 'FLOW // 01' },
-    { x: 14, y: 39, z: -51, color: '#ff6b4b', label: 'SIGNAL // 02' },
-    { x: -15, y: 62, z: -76, color: '#c77dff', label: 'NIGHT // 03' },
-    { x: 13, y: 84, z: -101, color: '#ffd27a', label: 'CORE // 04' },
-  ], [])
-  const gates = useMemo(() => Array.from({ length: 4 }, (_, index) => ({ y: 18 + index * 23, z: -13 - index * 25, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
+  const skyline = useMemo(() => Array.from({ length: 28 }, (_, index) => ({ x: (index % 2 ? 1 : -1) * (16 + (index % 5) * 4), y: 7 + (index % 4) * 3.5, z: -18 - index * 7.2, width: 2.5 + (index % 3) * 1.3, depth: 2.2 + (index % 2), height: 12 + (index % 5) * 5 })), [])
+  const spires = useMemo(() => Array.from({ length: 18 }, (_, index) => ({
+    x: (index % 2 ? 1 : -1) * (20 + (index % 3) * 4),
+    y: 0,
+    z: -25 - index * 12.8,
+    height: 12 + (index % 5) * 3.5,
+  })), [])
+  const billboards = useMemo(() => Array.from({ length: 10 }, (_, index) => ({
+    x: index % 2 ? 14 : -13,
+    y: 18 + index * 22.8,
+    z: -26 - index * 25.4,
+    color: ['#58e4dc', '#ff6b4b', '#c77dff', '#ffd27a'][index % 4],
+    label: ['FLOW', 'SIGNAL', 'NIGHT', 'CORE'][index % 4] + ` // 0${index + 1}`,
+  })), [])
+  const gates = useMemo(() => signalGates.map((gate, index) => ({ ...gate, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
   return <group>
     <SkyFreighter position={[-16, 28, -58]} color={stormline ? '#ff6670' : '#62ded7'} phase={.2} />
     <SkyFreighter position={[15, 55, -83]} color={zenith ? '#9ce8ff' : '#f0c56f'} phase={2.3} />
     <SkyFreighter position={[-18, 79, -112]} color={stormline ? '#ff6670' : '#c681ff'} phase={4.7} />
     <RouteRail mode={mode} />
-    <DistrictPulse y={18} z={-13} color={stormline ? '#ff5362' : '#f0b85f'} />
-    <DistrictPulse y={41} z={-38} color={zenith ? '#8ce7ff' : '#58e4dc'} />
-    <DistrictPulse y={64} z={-63} color={stormline ? '#ff5362' : '#c77dff'} />
-    <DistrictPulse y={87} z={-88} color={zenith ? '#8ce7ff' : '#ff794d'} />
-    <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={mutator === 'blackout' ? '#26243d' : stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={mutator === 'blackout' ? .18 : .5} roughness={1} /></mesh>
+    {signalGates.map((gate, index) => <DistrictPulse key={`district-${index}`} y={gate.y} z={gate.z} color={index % 3 === 1 ? (zenith ? '#8ce7ff' : '#58e4dc') : index % 3 === 2 ? (stormline ? '#ff5362' : '#c77dff') : (zenith ? '#8ce7ff' : '#f0b85f')} />)}
+    <mesh position={[0, courseHeight + 18, -150]}><sphereGeometry args={[16, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={mutator === 'blackout' ? '#26243d' : stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={mutator === 'blackout' ? .18 : .5} roughness={1} /></mesh>
     {skyline.map((tower, index) => <group key={`tower-${index}`} position={[tower.x, tower.y, tower.z]}>
       <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? skylineColor : (stormline ? '#3e4047' : zenith ? '#52687a' : '#46504c')} roughness={.85} metalness={.3} /></mesh>
       <mesh position={[0, tower.height / 2 + 1.5, 0]}><cylinderGeometry args={[.05, .05, 3, 6]} /><meshStandardMaterial color="#d7ad47" emissive="#d7ad47" emissiveIntensity={.7} /></mesh>
@@ -350,8 +380,9 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
       <Html transform position={[0, 0, .2]} distanceFactor={10}><div className="world-billboard" style={{ color: board.color }}>{board.label}</div></Html>
       <mesh position={[0, -2.1, 0]}><cylinderGeometry args={[.09, .09, 4.2, 8]} /><meshStandardMaterial color="#202631" metalness={.8} roughness={.3} /></mesh>
     </group>)}
+    {spires.map((spire, index) => <CitySpire key={`spire-${index}`} position={[spire.x, spire.y, spire.z]} height={spire.height} color={index % 3 === 0 ? skylineColor : '#27323a'} accent={index % 2 ? '#58e4dc' : '#ff6b4b'} phase={index} />)}
     {[-1, 1].map((side) => <mesh key={side} position={[side * 31, 7, -62]} rotation={[0, 0, side * .22]}><coneGeometry args={[18, 34, 5]} /><meshStandardMaterial color="#35443f" roughness={1} /></mesh>)}
-    {gates.map((gate, index) => <group key={`gate-${index}`} position={[0, gate.y, gate.z]} rotation={[0, index * .12, 0]}>
+    {gates.map((gate, index) => <group key={`gate-${index}`} position={[gate.x, gate.y, gate.z]} rotation={[0, index * .12, 0]}>
       <mesh><torusGeometry args={[5.5 + index * .35, .12, 12, 48]} /><meshStandardMaterial color={gate.color} emissive={gate.color} emissiveIntensity={.65} metalness={.55} roughness={.28} /></mesh>
       <mesh position={[0, -5.2, 0]}><boxGeometry args={[.18, 10.4, .18]} /><meshStandardMaterial color="#303b3a" metalness={.7} roughness={.35} /></mesh>
     </group>)}
@@ -412,7 +443,7 @@ function SummitBeacon({ active }: { active: boolean }) {
   const ring = useRef<THREE.Group>(null)
   useFrame((state) => { if (!ring.current || !active) return; ring.current.rotation.y = state.clock.elapsedTime * .7; ring.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.8) * .12 })
   if (!active) return null
-  return <group position={[0, courseHeight + 1.6, -54]}>
+  return <group position={[0, courseHeight + 1.6, -142]}>
     <pointLight color="#ffb56b" intensity={9} distance={26} decay={2} />
     <mesh position={[0, 3.5, 0]}><cylinderGeometry args={[.04, .3, 7, 8]} /><meshStandardMaterial color="#ff8b5c" emissive="#d94a31" emissiveIntensity={2.2} transparent opacity={.68} /></mesh>
     <group ref={ring}>
@@ -722,7 +753,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
     <Player running={running} runId={runId} mode={mode} mutator={mutator} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
-    <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
+    <Html position={[0, courseHeight + 1.2, -142]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
 
@@ -828,7 +859,7 @@ function App() {
   const handleCheckpoint = (next: number) => { const nextSeed = cardSeed + 1; setCheckpointHeight(next); setHeat(current => Math.min(100, current + 10)); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(nextSeed); setPendingCards(drawCards(nextSeed)); setRunning(false); cue('checkpoint') }
   const rerollCards = () => { if (cardRerolls <= 0) return; const nextSeed = cardSeed + 1; setCardRerolls(0); setCardSeed(nextSeed); setPendingCards(drawCards(nextSeed)); setSignalFlash('SIGNAL DECK BURNED · NEW HAND DEALT'); cue('burst') }
   const handleGate = (index: number, airborne: boolean) => { const cut = (1.8 + (airborne ? .8 : 0)) * flowMultiplier; setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3 + (airborne ? 2 : 0)); setHeat(current => Math.min(100, current + (airborne ? 30 : 22))); setStartedAt(current => current + cut * 1000); if (airborne) setAirGateHits(current => current + 1); setSignalFlash(`${airborne ? 'AIR GATE' : 'SIGNAL GATE'} ${index + 1}/4 · FLOW x${flowMultiplier.toFixed(2)} · -${cut.toFixed(1)}S`); cue('gate') }
-  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12 * flowMultiplier)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · FLOW x${flowMultiplier.toFixed(2)}`); cue('shard') }
+  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12 * flowMultiplier)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/${signalArtifacts.length} · FLOW x${flowMultiplier.toFixed(2)}`); cue('shard') }
   const toggleSound = () => { setSoundOn(current => { muted.current = current; return !current }) }
   const copyChallengeCode = () => { void navigator.clipboard?.writeText(challengeCode); setSignalFlash(`RUN CODE COPIED · ${challengeCode}`) }
   return <main className={heat > 70 ? 'heat-hot' : ''}>
@@ -846,21 +877,21 @@ function App() {
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className="daily-mutator">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong><small>RULESET ROTATES AT MIDNIGHT</small></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
-    {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
+    {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/{signalGates.length}</strong><small>RING THE SIGNAL</small></div>}
     {running && <div className="airgate-hunt">AIR GATES <strong>{airGateHits}</strong><small>THREAD THEM MID-AIR</small></div>}
-    {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/6</strong><small>FIND THE KEYS</small></div>}
-    {running && <div className="hunter-hunt">HUNTERS <strong>4</strong><small>DO NOT TOUCH THE LIGHT</small></div>}
-    {running && <div className="gust-hunt">GUST WALLS <strong>3</strong><small>READ THE ARROWS</small></div>}
+    {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/{signalArtifacts.length}</strong><small>FIND THE KEYS</small></div>}
+    {running && <div className="hunter-hunt">HUNTERS <strong>{signalHunters.length}</strong><small>DO NOT TOUCH THE LIGHT</small></div>}
+    {running && <div className="gust-hunt">GUST WALLS <strong>{signalGusts.length}</strong><small>READ THE ARROWS</small></div>}
     {running && <section className="heat-meter" aria-label="Momentum heat"><span>FLOW HEAT</span><strong>{Math.round(heat)}%</strong><div><i style={{ width: `${heat}%` }} /></div><small>{heat > 70 ? 'OVERDRIVE' : 'KEEP THE LINE'}</small></section>}
     {running && <section className="route-radar" aria-label="Next ledge radar"><span>NEXT LEDGE</span><strong>{Math.floor(nextPlatform.y * 10)}M · {nextPlatform.kind.toUpperCase()}</strong><div><i style={{ left: `${radarX}%` }} /></div><small>{nextPlatform.x > .5 ? 'STEER RIGHT' : nextPlatform.x < -.5 ? 'STEER LEFT' : 'CENTER LINE'}</small></section>}
     {running && <div className="touch-controls" aria-label="Touch controls"><div className="touch-dpad"><button data-game-key="a" aria-label="Move left">◀</button><button data-game-key="w" aria-label="Move forward">▲</button><button data-game-key="d" aria-label="Move right">▶</button><button data-game-key="s" aria-label="Move backward">▼</button></div><div className="touch-actions"><button data-game-key=" " aria-label="Jump">JUMP</button><button data-game-key="shift" aria-label="Signal burst">BURST</button><button data-game-key="e" aria-label="Grapple">GRAPPLE</button><button data-game-key="q" aria-label="Phase shift">PHASE</button></div></div>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
-    <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
+    <section className="route"><span>ROUTE 01 / CLOUDLINE · {Math.round(courseHeight * 10)}M</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><div className="daily-card">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D OR LEFT STICK · W / S ADVANCE · SPACE / A JUMP · E / Y GRAPPLE · SHIFT / X BURST · Q / B PHASE · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && pendingCards.length === 0 && <section className="pause-panel"><div className="eyebrow">RUN PAUSED · {modeLabel}</div><h2>HOLD<br /><i>THE LINE.</i></h2><p>Checkpoint anchor <strong>{Math.floor(checkpointHeight * 10)}M</strong><br />Run code <strong>{challengeCode}</strong></p><button onClick={resumeRun}>RESUME RUN <span>↗</span></button><small>R RESET RUN · C RECENTER · V CHANGE VIEW</small></section>}
-    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · AIR GATES {airGateHits} · CACHE {artifactHits.size}/6 · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><div className="run-history"><span>RECENT ASCENTS</span>{runHistory.slice(0, 3).map((run, index) => <div key={`${run.date}-${index}`}><b>{run.grade}</b><strong>{formatTime(run.time)}</strong><small>{run.mode} · {run.mutator}</small></div>)}</div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
+    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/{signalGates.length} · AIR GATES {airGateHits} · CACHE {artifactHits.size}/{signalArtifacts.length} · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><div className="run-history"><span>RECENT ASCENTS</span>{runHistory.slice(0, 3).map((run, index) => <div key={`${run.date}-${index}`}><b>{run.grade}</b><strong>{formatTime(run.time)}</strong><small>{run.mode} · {run.mutator}</small></div>)}</div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><button className="reroll-card" onClick={rerollCards} disabled={cardRerolls <= 0}>REROLL HAND · {cardRerolls ? '1 LEFT' : 'SPENT'}</button><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST · REROLL BURNS THE HAND</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
