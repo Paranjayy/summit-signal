@@ -15,6 +15,17 @@ type SignalGust = { x: number; y: number; z: number; direction: number; strength
 type GhostFrame = { t: number; x: number; y: number; z: number }
 type RunRecord = { time: number; grade: string; mode: string; mutator: string; date: string }
 type DailyMutator = 'redline' | 'low-gravity' | 'blackout'
+type RunContractKind = 'clean' | 'air' | 'cache' | 'precision'
+type RunContract = { kind: RunContractKind; title: string; brief: string; reward: string; accent: string }
+const runContracts: RunContract[] = [
+  { kind: 'clean', title: 'GHOST PROTOCOL', brief: 'Reach the summit without a fall', reward: '+3 grade · +4s banked', accent: '#8b6ee8' },
+  { kind: 'air', title: 'AIRLINE', brief: 'Thread 3 gates while airborne', reward: '+3 grade · elite route', accent: '#3e8f98' },
+  { kind: 'cache', title: 'KEYMASTER', brief: 'Recover 6 artifact caches', reward: '+3 grade · vault clear', accent: '#d7ad47' },
+  { kind: 'precision', title: 'SURGICAL', brief: 'Land 8 perfect platforms', reward: '+3 grade · clean cut', accent: '#d64735' },
+]
+const contractModeOffset: Record<RunMode, number> = { standard: 0, stormline: 1, zenith: 2 }
+const contractComplete = (contract: RunContract, stats: { falls: number; airGates: number; artifacts: number; perfects: number }) => contract.kind === 'clean' ? stats.falls === 0 : contract.kind === 'air' ? stats.airGates >= 3 : contract.kind === 'cache' ? stats.artifacts >= 6 : stats.perfects >= 8
+const contractProgress = (contract: RunContract, stats: { falls: number; airGates: number; artifacts: number; perfects: number }) => contract.kind === 'clean' ? `${stats.falls ? 'BROKEN' : 'LIVE'}` : contract.kind === 'air' ? `${Math.min(3, stats.airGates)}/3` : contract.kind === 'cache' ? `${Math.min(6, stats.artifacts)}/6` : `${Math.min(8, stats.perfects)}/8`
 const dailyMutator: DailyMutator = (['redline', 'low-gravity', 'blackout'] as DailyMutator[])[new Date().getDate() % 3]
 const dailyMutatorLabel = dailyMutator === 'redline' ? 'REDLINE DAY' : dailyMutator === 'low-gravity' ? 'LOW-G DAY' : 'BLACKOUT DAY'
 const formatTime = (seconds: number) => {
@@ -803,6 +814,9 @@ function App() {
   const [runHistory, setRunHistory] = useState<RunRecord[]>(() => {
     try { return JSON.parse(localStorage.getItem('summit-signal-history') || '[]') as RunRecord[] } catch { return [] }
   })
+  const activeContract = runContracts[(new Date().getDate() + contractModeOffset[mode]) % runContracts.length]
+  const contractStats = { falls, airGates: airGateHits, artifacts: artifactHits.size, perfects: perfectLands }
+  const contractCleared = contractComplete(activeContract, contractStats)
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const flowMultiplier = 1 + Math.min(2, Math.floor(combo / 5) * .25)
   const biome = getBiome(height, courseHeight)
@@ -835,7 +849,7 @@ function App() {
   const completeRun = () => {
     const time = startedAt ? (Date.now() - startedAt) / 1000 : elapsed
     setFinalTime(time)
-    const gradeScore = gateHits.size * 2 + artifactHits.size + (combo >= 10 ? 2 : 0) + (falls === 0 ? 1 : 0)
+    const gradeScore = gateHits.size * 2 + artifactHits.size + (combo >= 10 ? 2 : 0) + (falls === 0 ? 1 : 0) + (contractComplete(activeContract, { falls, airGates: airGateHits, artifacts: artifactHits.size, perfects: perfectLands }) ? 3 : 0)
     setRunGrade(gradeScore >= 10 ? 'S' : gradeScore >= 7 ? 'A' : gradeScore >= 4 ? 'B' : 'C')
     const grade = gradeScore >= 10 ? 'S' : gradeScore >= 7 ? 'A' : gradeScore >= 4 ? 'B' : 'C'
     setRunHistory(current => { const next = [{ time, grade, mode: modeLabel, mutator: dailyMutatorLabel, date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }, ...current].slice(0, 5); localStorage.setItem('summit-signal-history', JSON.stringify(next)); return next })
@@ -875,6 +889,7 @@ function App() {
     {running && <section className={`phase ${phaseReady ? 'ready' : ''}`} aria-label="Phase shift"><span>PHASE SHIFT</span><strong>{phaseReady ? 'READY' : 'RECHARGING'}</strong><small>Q · GHOST HUNTERS</small></section>}
     {running && ghostPath.length > 1 && <div className="echo-badge">ECHO <strong>PB GHOST</strong><small>CHASE YOUR LINE</small></div>}
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
+    {running && <div className={`run-contract ${contractCleared ? 'cleared' : ''}`} style={{ '--contract-accent': activeContract.accent } as React.CSSProperties}><span>BOUNTY / {activeContract.title}</span><strong>{contractCleared ? 'CLEAR' : contractProgress(activeContract, contractStats)}</strong><small>{activeContract.brief}</small></div>}
     {running && <div className="daily-mutator">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong><small>RULESET ROTATES AT MIDNIGHT</small></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/{signalGates.length}</strong><small>RING THE SIGNAL</small></div>}
@@ -888,7 +903,7 @@ function App() {
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · {Math.round(courseHeight * 10)}M</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><div className="daily-card">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D OR LEFT STICK · W / S ADVANCE · SPACE / A JUMP · E / Y GRAPPLE · SHIFT / X BURST · Q / B PHASE · MOUSE LOOK · V VIEW</small></section>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-contract intro-contract" style={{ '--contract-accent': activeContract.accent } as React.CSSProperties}><span>TODAY'S BOUNTY · {activeContract.title}</span><strong>{activeContract.brief}</strong><small>{activeContract.reward}</small></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><div className="daily-card">DAILY MUTATOR <strong>{dailyMutatorLabel}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D OR LEFT STICK · W / S ADVANCE · SPACE / A JUMP · E / Y GRAPPLE · SHIFT / X BURST · Q / B PHASE · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && pendingCards.length === 0 && <section className="pause-panel"><div className="eyebrow">RUN PAUSED · {modeLabel}</div><h2>HOLD<br /><i>THE LINE.</i></h2><p>Checkpoint anchor <strong>{Math.floor(checkpointHeight * 10)}M</strong><br />Run code <strong>{challengeCode}</strong></p><button onClick={resumeRun}>RESUME RUN <span>↗</span></button><small>R RESET RUN · C RECENTER · V CHANGE VIEW</small></section>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/{signalGates.length} · AIR GATES {airGateHits} · CACHE {artifactHits.size}/{signalArtifacts.length} · PERFECT {perfectLands} · SHORTCUTS {shortcutLands}</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><div className="run-history"><span>RECENT ASCENTS</span>{runHistory.slice(0, 3).map((run, index) => <div key={`${run.date}-${index}`}><b>{run.grade}</b><strong>{formatTime(run.time)}</strong><small>{run.mode} · {run.mutator}</small></div>)}</div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
