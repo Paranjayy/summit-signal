@@ -378,6 +378,8 @@ function App() {
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const biome = getBiome(height, courseHeight)
   const modeLabel = getModeLabel(mode)
+  const nextPlatform = platforms.find(platform => platform.y > height + .9) ?? platforms[platforms.length - 1]
+  const radarX = THREE.MathUtils.clamp(50 + nextPlatform.x * 8, 10, 90)
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   useEffect(() => {
     if (!running || completed || !startedAt) return
@@ -428,6 +430,7 @@ function App() {
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
     {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/6</strong><small>FIND THE KEYS</small></div>}
     {running && <section className="heat-meter" aria-label="Momentum heat"><span>FLOW HEAT</span><strong>{Math.round(heat)}%</strong><div><i style={{ width: `${heat}%` }} /></div><small>{heat > 70 ? 'OVERDRIVE' : 'KEEP THE LINE'}</small></section>}
+    {running && <section className="route-radar" aria-label="Next ledge radar"><span>NEXT LEDGE</span><strong>{Math.floor(nextPlatform.y * 10)}M · {nextPlatform.kind.toUpperCase()}</strong><div><i style={{ left: `${radarX}%` }} /></div><small>{nextPlatform.x > .5 ? 'STEER RIGHT' : nextPlatform.x < -.5 ? 'STEER LEFT' : 'CENTER LINE'}</small></section>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
