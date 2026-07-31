@@ -60,9 +60,15 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   useEffect(() => {
     const down = (event: KeyboardEvent) => { keys.current[event.key.toLowerCase()] = true; if (event.key.toLowerCase() === 'r') reset() }
     const up = (event: KeyboardEvent) => { keys.current[event.key.toLowerCase()] = false }
-    addEventListener('keydown', down); addEventListener('keyup', up)
-    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up) }
+    const clearKeys = () => { keys.current = {} }
+    addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clearKeys); addEventListener('visibilitychange', clearKeys)
+    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up); removeEventListener('blur', clearKeys); removeEventListener('visibilitychange', clearKeys) }
   }, [])
+
+  useEffect(() => {
+    reset()
+    keys.current = {}
+  }, [running])
 
   useFrame((state, delta) => {
     if (!body.current || !running) return
@@ -70,7 +76,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
     const steer = (Number(Boolean(keys.current.d || keys.current.arrowright)) - Number(Boolean(keys.current.a || keys.current.arrowleft)))
     const pace = (Number(Boolean(keys.current.w || keys.current.arrowup)) - Number(Boolean(keys.current.s || keys.current.arrowdown)))
     velocity.current.x = THREE.MathUtils.damp(velocity.current.x, steer * 5.1, 10, dt)
-    velocity.current.z = THREE.MathUtils.damp(velocity.current.z, pace * 3.8, 9, dt)
+    velocity.current.z = pace === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, pace * 3.8, 9, dt)
     velocity.current.y -= 13.8 * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
