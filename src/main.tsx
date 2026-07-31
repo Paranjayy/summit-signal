@@ -84,7 +84,7 @@ function WorldBackdrop() {
   </group>
 }
 
-function Player({ running, onProgress, onFall, onCollect, onLand, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onLand: () => void; onComplete: () => void }) {
+function Player({ running, onProgress, onFall, onCollect, onLand, onBurst, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
@@ -97,7 +97,9 @@ function Player({ running, onProgress, onFall, onCollect, onLand, onComplete }: 
   const dragging = useRef(false)
   const previousPointer = useRef({ x: 0, y: 0 })
   const completedRun = useRef(false)
-  const reset = () => { position.current.set(0, .34, 0); velocity.current.set(0, 0, 0); grounded.current = true }
+  const burstCooldown = useRef(0)
+  const burstLatch = useRef(false)
+  const reset = () => { position.current.set(0, .34, 0); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false }
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } }
@@ -130,11 +132,25 @@ function Player({ running, onProgress, onFall, onCollect, onLand, onComplete }: 
     const steer = (Number(Boolean(keys.current.d || keys.current.arrowright)) - Number(Boolean(keys.current.a || keys.current.arrowleft)))
     const pace = (Number(Boolean(keys.current.w || keys.current.arrowup || keys.current.keyw)) - Number(Boolean(keys.current.s || keys.current.arrowdown || keys.current.keys)))
     const wantsJump = Boolean(keys.current[' '] || keys.current.space || keys.current.spacebar)
+    const wantsBurst = Boolean(keys.current.shift || keys.current.shiftleft || keys.current.shiftright)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
     const targetX = -Math.sin(yaw.current) * pace * 3.8 + Math.cos(yaw.current) * steer * 5.1
     const targetZ = -Math.cos(yaw.current) * pace * 3.8 - Math.sin(yaw.current) * steer * 5.1
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
+    burstCooldown.current = Math.max(0, burstCooldown.current - dt)
+    if (!wantsBurst) burstLatch.current = false
+    if (wantsBurst && !burstLatch.current && burstCooldown.current <= 0) {
+      const burstDirection = new THREE.Vector3(targetX, 0, targetZ)
+      if (burstDirection.lengthSq() < .01) burstDirection.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
+      burstDirection.normalize()
+      velocity.current.addScaledVector(burstDirection, 8.2)
+      velocity.current.y = Math.max(velocity.current.y, 3.1)
+      grounded.current = false
+      burstCooldown.current = 2.6
+      burstLatch.current = true
+      onBurst()
+    }
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5)
     velocity.current.x += crosswind * dt
     if (grounded.current) {
@@ -182,7 +198,7 @@ function Player({ running, onProgress, onFall, onCollect, onLand, onComplete }: 
   </group>
 }
 
-function World({ running, onProgress, onFall, collectedShards, onCollect, onLand, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onComplete: () => void }) {
+function World({ running, onProgress, onFall, collectedShards, onCollect, onLand, onBurst, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
@@ -199,7 +215,7 @@ function World({ running, onProgress, onFall, collectedShards, onCollect, onLand
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onComplete={onComplete} />
+    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onBurst={onBurst} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -219,6 +235,7 @@ function App() {
   const [combo, setCombo] = useState(0)
   const [comboBest, setComboBest] = useState(() => Number(localStorage.getItem('summit-signal-combo-best') || 0))
   const [signalFlash, setSignalFlash] = useState('')
+  const [burstReady, setBurstReady] = useState(true)
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   useEffect(() => {
@@ -226,24 +243,25 @@ function App() {
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setFalls(0); setCombo(0); setSignalFlash(''); setCollectedShards(new Set()); setRunning(true) }
+  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
-    const time = elapsed
+    const time = startedAt ? (Date.now() - startedAt) / 1000 : elapsed
     setFinalTime(time)
     setCompleted(true)
     setRunning(false)
     if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
   return <main>
-    <World running={running} onProgress={onProgress} onFall={() => { setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · FIND YOUR LINE') }} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onComplete={completeRun} />
+    <World running={running} onProgress={onProgress} onFall={() => { setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · FIND YOUR LINE') }} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600) }} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
     {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
+    {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · SHIFT BURST · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
