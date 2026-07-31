@@ -67,13 +67,17 @@ function SignalShardMesh({ shard, collected }: { shard: SignalShard; collected: 
   </Float>
 }
 
-function WorldBackdrop() {
+function WorldBackdrop({ mode }: { mode: RunMode }) {
+  const stormline = mode === 'stormline'
+  const zenith = mode === 'zenith'
+  const sunColor = stormline ? '#ef6c4d' : zenith ? '#b9dcff' : '#f1c171'
+  const skylineColor = stormline ? '#26343d' : zenith ? '#40566b' : '#313d42'
   const skyline = useMemo(() => Array.from({ length: 14 }, (_, index) => ({ x: (index % 2 ? 1 : -1) * (16 + (index % 5) * 4), y: 7 + (index % 4) * 3.5, z: -18 - index * 6, width: 2.5 + (index % 3) * 1.3, depth: 2.2 + (index % 2), height: 12 + (index % 5) * 5 })), [])
   const gates = useMemo(() => Array.from({ length: 4 }, (_, index) => ({ y: 18 + index * 23, z: -13 - index * 25, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
   return <group>
-    <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color="#f1c171" emissive="#b85b2e" emissiveIntensity={.5} roughness={1} /></mesh>
+    <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={.5} roughness={1} /></mesh>
     {skyline.map((tower, index) => <group key={`tower-${index}`} position={[tower.x, tower.y, tower.z]}>
-      <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? '#313d42' : '#46504c'} roughness={.85} metalness={.3} /></mesh>
+      <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? skylineColor : (stormline ? '#3e4047' : zenith ? '#52687a' : '#46504c')} roughness={.85} metalness={.3} /></mesh>
       <mesh position={[0, tower.height / 2 + 1.5, 0]}><cylinderGeometry args={[.05, .05, 3, 6]} /><meshStandardMaterial color="#d7ad47" emissive="#d7ad47" emissiveIntensity={.7} /></mesh>
       {[-1, 0, 1].map((windowIndex) => <mesh key={windowIndex} position={[windowIndex * .48, 0, tower.depth / 2 + .02]}><boxGeometry args={[.22, .12, .04]} /><meshStandardMaterial color="#e9b957" emissive="#e9b957" emissiveIntensity={1.3} /></mesh>)}
     </group>)}
@@ -208,17 +212,18 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
 
 function World({ running, mode, onProgress, onFall, collectedShards, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
+  const palette = mode === 'stormline' ? { sky: '#9caaa8', fog: '#73827f', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
-    <color attach="background" args={['#d5cdbd']} />
-    <fog attach="fog" args={['#d5cdbd', 34, 190]} />
-    <ambientLight intensity={1.55} color="#fff3d7" />
+    <color attach="background" args={[palette.sky]} />
+    <fog attach="fog" args={[palette.fog, 34, 190]} />
+    <ambientLight intensity={1.55} color={palette.ambient} />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
     <Environment preset="sunset" />
-    <WorldBackdrop />
+    <WorldBackdrop mode={mode} />
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
     <Sparkles count={85} scale={[28, 30, 25]} size={2.5} speed={.22} color="#fff0bf" />
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color="#546451" roughness={1} /></mesh>
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
     {platforms.map((p, i) => <PlatformMesh platform={p} key={i} />)}
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
@@ -247,6 +252,7 @@ function App() {
   const [checkpointHeight, setCheckpointHeight] = useState(0)
   const [mode, setMode] = useState<RunMode>('standard')
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
+  const modeLabel = mode === 'stormline' ? 'STORMLINE' : mode === 'zenith' ? 'ZENITH' : 'STANDARD'
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   useEffect(() => {
     if (!running || completed || !startedAt) return
@@ -270,12 +276,13 @@ function App() {
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
     {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
     {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
+    {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SHIFT BURST · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
-    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
+    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
     {running && <div className="camera-hint">C / RECENTER VIEW</div>}
