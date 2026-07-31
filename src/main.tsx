@@ -384,6 +384,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
     <mesh position={[0, 1.12, -.23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
+    {heat > 70 && <><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .04, 0]}><torusGeometry args={[.62, .035, 8, 32]} /><meshStandardMaterial color="#ff744e" emissive="#d6422f" emissiveIntensity={1.8} transparent opacity={.78} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .08, 0]}><torusGeometry args={[.9, .018, 8, 32]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={1.5} transparent opacity={.6} /></mesh><pointLight position={[0, .7, 0]} color="#ff6e4c" intensity={.6} distance={3.5} /></>}
   </group>
 }
 
