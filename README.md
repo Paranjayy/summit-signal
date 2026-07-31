@@ -10,7 +10,7 @@ An original browser 3D climbing game. Navigate a vertical route of industrial de
 
 ## Controls
 
-Move with WASD or the arrow keys. `R` resets a run. The character auto-bounces on every safe landing.
+Move with A/D or the arrow keys, advance with W/S, and press Space to jump. Click the scene to capture the mouse for a Valorant-style camera; drag works as a fallback. `R` resets a run.
 
 ## Asset policy
 
