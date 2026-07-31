@@ -149,6 +149,19 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
       <mesh><torusGeometry args={[5.5 + index * .35, .12, 12, 48]} /><meshStandardMaterial color={gate.color} emissive={gate.color} emissiveIntensity={.65} metalness={.55} roughness={.28} /></mesh>
       <mesh position={[0, -5.2, 0]}><boxGeometry args={[.18, 10.4, .18]} /><meshStandardMaterial color="#303b3a" metalness={.7} roughness={.35} /></mesh>
     </group>)}
+    <group position={[0, 34, -31]}>
+      {[-1, 1].map(side => <mesh key={side} position={[side * 7, 0, 0]}><boxGeometry args={[.45, 13, .45]} /><meshStandardMaterial color="#202631" metalness={.7} roughness={.28} /></mesh>)}
+      <mesh position={[0, 6.3, 0]}><boxGeometry args={[14.4, .45, .45]} /><meshStandardMaterial color="#ab5eff" emissive="#7d35d4" emissiveIntensity={1.4} metalness={.45} roughness={.24} /></mesh>
+      <mesh position={[0, -5.7, 0]}><boxGeometry args={[14.4, .12, .12]} /><meshStandardMaterial color="#53d8d2" emissive="#29c0bc" emissiveIntensity={1.7} /></mesh>
+    </group>
+    <group position={[0, 65, -65]}>
+      {[-1, 1].map(side => <group key={side} position={[side * 6.8, 0, 0]}><mesh><cylinderGeometry args={[.55, .72, 15, 10]} /><meshStandardMaterial color="#d7e5e6" roughness={.8} /></mesh><mesh position={[0, 3.8, .05]}><boxGeometry args={[2.4, 1.2, .12]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.6} transparent opacity={.8} /></mesh></group>)}
+      <mesh position={[0, 6.5, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[6.8, .16, 12, 48]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.9} transparent opacity={.7} /></mesh>
+    </group>
+    <Float speed={.8} rotationIntensity={.08} floatIntensity={.18}><group position={[0, 93, -94]}>
+      <mesh><torusGeometry args={[7.5, .24, 14, 64]} /><meshStandardMaterial color="#ff6a47" emissive="#c83c2b" emissiveIntensity={1.8} metalness={.6} roughness={.2} /></mesh>
+      <mesh rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[5.8, .08, 10, 48]} /><meshStandardMaterial color="#f7d27e" emissive="#d9a43d" emissiveIntensity={1.5} /></mesh>
+    </group></Float>
   </group>
 }
 
