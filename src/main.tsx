@@ -494,6 +494,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   const landingRing = useRef<THREE.Mesh>(null)
   const landingPulse = useRef(0)
   const overdriveOrbit = useRef<THREE.Group>(null)
+  const routeEventField = useRef<THREE.Group>(null)
   const trailA = useRef<THREE.Mesh>(null)
   const trailB = useRef<THREE.Mesh>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
@@ -587,6 +588,12 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     const routeEvent = routeEventAt(position.current.y)
     const eventSpeed = routeEvent === 'surge' ? 1.14 : 1
     const eventAirControl = routeEvent === 'quiet' ? .2 : 0
+    if (routeEventField.current) {
+      const eventColor = routeEventLabels[routeEvent].accent
+      routeEventField.current.rotation.y += dt * (routeEvent === 'crosswind' ? -1.8 : 1.2)
+      routeEventField.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 2.2) * .035)
+      routeEventField.current.children.forEach((child) => { const material = (child as THREE.Mesh).material; if (material && !Array.isArray(material) && 'color' in material) (material as THREE.MeshStandardMaterial).color.set(eventColor) })
+    }
     const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed * eventSpeed + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus + eventAirControl)
     const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier * dailySpeed * eventSpeed - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus + eventAirControl)
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
@@ -763,6 +770,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
     <mesh position={[0, 1.12, -.23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
+    <group ref={routeEventField} position={[0, .12, 0]}><mesh rotation={[-Math.PI / 2, 0, 0]}><torusGeometry args={[.94, .018, 8, 36]} /><meshStandardMaterial color="#d64735" emissive="#d64735" emissiveIntensity={1.5} transparent opacity={.52} depthWrite={false} /></mesh><mesh position={[.94, 0, 0]} rotation={[0, 0, Math.PI / 2]}><coneGeometry args={[.08, .28, 3]} /><meshStandardMaterial color="#d64735" emissive="#d64735" emissiveIntensity={1.4} transparent opacity={.72} depthWrite={false} /></mesh><mesh position={[-.94, 0, 0]} rotation={[0, 0, -Math.PI / 2]}><coneGeometry args={[.08, .28, 3]} /><meshStandardMaterial color="#d64735" emissive="#d64735" emissiveIntensity={1.4} transparent opacity={.72} depthWrite={false} /></mesh></group>
     <group ref={overdriveOrbit} visible={false} position={[0, .78, 0]}><mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.72, .035, 8, 32]} /><meshStandardMaterial color="#ff744e" emissive="#d6422f" emissiveIntensity={1.8} transparent opacity={.78} /></mesh><mesh position={[.88, 0, 0]}><octahedronGeometry args={[.1, 0]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={2.2} /></mesh><mesh position={[-.44, .08, .76]}><octahedronGeometry args={[.07, 0]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={2.1} /></mesh><pointLight position={[0, -.08, 0]} color="#ff6e4c" intensity={.8} distance={3.5} /></group>
   </group>
 }
