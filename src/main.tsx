@@ -367,7 +367,7 @@ function ZenithAurora({ active }: { active: boolean }) {
   const aurora = useRef<THREE.Group>(null)
   useFrame((state) => { if (aurora.current && active) { aurora.current.rotation.y = state.clock.elapsedTime * .08; aurora.current.rotation.z = Math.sin(state.clock.elapsedTime * .18) * .08 } })
   if (!active) return null
-  return <group ref={aurora} position={[0, 82, -84]}>
+  return <group ref={aurora} position={[0, 184, -122]}>
     {[0, 1, 2].map((index) => <mesh key={index} rotation={[Math.PI / 2 + index * .08, index * .32, index * .25]}><torusGeometry args={[11 + index * 2.4, .16 - index * .025, 10, 64]} /><meshStandardMaterial color={index % 2 ? '#8ddfff' : '#c18cff'} emissive={index % 2 ? '#58c9ef' : '#8d53d2'} emissiveIntensity={1.8} transparent opacity={.25} depthWrite={false} /></mesh>)}
   </group>
 }
@@ -396,6 +396,8 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
     <SkyFreighter position={[-16, 28, -58]} color={stormline ? '#ff6670' : '#62ded7'} phase={.2} />
     <SkyFreighter position={[15, 55, -83]} color={zenith ? '#9ce8ff' : '#f0c56f'} phase={2.3} />
     <SkyFreighter position={[-18, 79, -112]} color={stormline ? '#ff6670' : '#c681ff'} phase={4.7} />
+    <SkyFreighter position={[17, 142, -126]} color={zenith ? '#9ce8ff' : '#58e4dc'} phase={1.3} />
+    <SkyFreighter position={[-16, 204, -151]} color={stormline ? '#ff6670' : '#f0c56f'} phase={3.8} />
     <RouteRail mode={mode} />
     {signalGates.map((gate, index) => <DistrictPulse key={`district-${index}`} y={gate.y} z={gate.z} color={index % 3 === 1 ? (zenith ? '#8ce7ff' : '#58e4dc') : index % 3 === 2 ? (stormline ? '#ff5362' : '#c77dff') : (zenith ? '#8ce7ff' : '#f0b85f')} />)}
     <mesh position={[0, courseHeight + 18, -150]}><sphereGeometry args={[16, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={mutator === 'blackout' ? '#26243d' : stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={mutator === 'blackout' ? .18 : .5} roughness={1} /></mesh>
@@ -431,7 +433,7 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
       {[-1, 1].map(side => <group key={side} position={[side * 6.8, 0, 0]}><mesh><cylinderGeometry args={[.55, .72, 15, 10]} /><meshStandardMaterial color="#d7e5e6" roughness={.8} /></mesh><mesh position={[0, 3.8, .05]}><boxGeometry args={[2.4, 1.2, .12]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.6} transparent opacity={.8} /></mesh></group>)}
       <mesh position={[0, 6.5, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[6.8, .16, 12, 48]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.9} transparent opacity={.7} /></mesh>
     </group>
-    <Float speed={.8} rotationIntensity={.08} floatIntensity={.18}><group position={[0, 93, -94]}>
+    <Float speed={.8} rotationIntensity={.08} floatIntensity={.18}><group position={[0, courseHeight - 2.2, -142]}>
       <mesh><torusGeometry args={[7.5, .24, 14, 64]} /><meshStandardMaterial color="#ff6a47" emissive="#c83c2b" emissiveIntensity={1.8} metalness={.6} roughness={.2} /></mesh>
       <mesh rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[5.8, .08, 10, 48]} /><meshStandardMaterial color="#f7d27e" emissive="#d9a43d" emissiveIntensity={1.5} /></mesh>
     </group></Float>
