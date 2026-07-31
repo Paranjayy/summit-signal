@@ -11,6 +11,7 @@ type SignalShard = { x: number; y: number; z: number }
 type SignalGate = { x: number; y: number; z: number; radius: number }
 type SignalArtifact = { x: number; y: number; z: number; label: string }
 type SignalHunter = { x: number; y: number; z: number; orbit: number; phase: number }
+type SignalGust = { x: number; y: number; z: number; direction: number; strength: number }
 type GhostFrame = { t: number; x: number; y: number; z: number }
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -117,6 +118,12 @@ const signalHunters: SignalHunter[] = [
   { x: 0, y: 87.5, z: -91, orbit: 4.1, phase: 1.4 },
 ]
 
+const signalGusts: SignalGust[] = [
+  { x: -1, y: 36, z: -24, direction: 1, strength: 3.8 },
+  { x: 1.5, y: 58, z: -51, direction: -1, strength: 4.4 },
+  { x: -1.2, y: 77, z: -73, direction: 1, strength: 5.1 },
+]
+
 const hunterPosition = (hunter: SignalHunter, time: number, target = new THREE.Vector3()) => {
   const angle = time * 1.25 + hunter.phase
   return target.set(hunter.x + Math.cos(angle) * hunter.orbit, hunter.y + Math.sin(angle * 1.7) * .7, hunter.z + Math.sin(angle) * hunter.orbit * .62)
@@ -221,6 +228,16 @@ function GateRotor({ y, z, color, index }: { y: number; z: number; color: string
   </group>
 }
 
+function GustWall({ gust, mode }: { gust: SignalGust; mode: RunMode }) {
+  const wall = useRef<THREE.Group>(null)
+  const color = mode === 'stormline' ? '#ff6b73' : mode === 'zenith' ? '#91e7ff' : '#9bb8ff'
+  useFrame((state) => { if (wall.current) { wall.current.rotation.y = Math.sin(state.clock.elapsedTime * .7 + gust.y) * .12; wall.current.position.x = gust.x + Math.sin(state.clock.elapsedTime * 1.2 + gust.y) * .22 } })
+  return <group ref={wall} position={[gust.x, gust.y, gust.z]} rotation={[0, 0, gust.direction > 0 ? -.08 : .08]}>
+    <mesh><boxGeometry args={[.12, 7.5, 4.8]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={.8} transparent opacity={.07} depthWrite={false} /></mesh>
+    {[1.6, .2, -1.2].map((offset, index) => <mesh key={index} position={[gust.direction * offset, Math.sin(index) * .18, 0]} rotation={[0, 0, gust.direction > 0 ? -.22 : .22]}><coneGeometry args={[.32, 1.4, 3]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} transparent opacity={.55} depthWrite={false} /></mesh>)}
+  </group>
+}
+
 function WorldBackdrop({ mode }: { mode: RunMode }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -262,6 +279,7 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
       <mesh position={[0, -5.2, 0]}><boxGeometry args={[.18, 10.4, .18]} /><meshStandardMaterial color="#303b3a" metalness={.7} roughness={.35} /></mesh>
     </group>)}
     {gates.map((gate, index) => <GateRotor key={`gate-rotor-${index}`} y={gate.y} z={gate.z} color={gate.color} index={index} />)}
+    {signalGusts.map((gust, index) => <GustWall key={`gust-${index}`} gust={gust} mode={mode} />)}
     <group position={[0, 34, -31]}>
       {[-1, 1].map(side => <mesh key={side} position={[side * 7, 0, 0]}><boxGeometry args={[.45, 13, .45]} /><meshStandardMaterial color="#202631" metalness={.7} roughness={.28} /></mesh>)}
       <mesh position={[0, 6.3, 0]}><boxGeometry args={[14.4, .45, .45]} /><meshStandardMaterial color="#ab5eff" emissive="#7d35d4" emissiveIntensity={1.4} metalness={.45} roughness={.24} /></mesh>
@@ -461,6 +479,9 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     const windScale = (mode === 'stormline' ? 1.65 : mode === 'zenith' ? 1.15 : 1) * modifiers.windMultiplier * overdriveWind
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5) * windScale
     velocity.current.x += crosswind * dt
+    signalGusts.forEach((gust) => {
+      if (Math.abs(position.current.y - gust.y) < 4.2 && Math.hypot(position.current.x - gust.x, position.current.z - gust.z) < 3.4) velocity.current.x += gust.direction * gust.strength * windScale * dt
+    })
     if (grounded.current) {
       const supported = platforms.some((p) => { const platformX = platformXAt(p, state.clock.elapsedTime); return Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - platformX) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12 })
       if (!supported) { grounded.current = false; velocity.current.y = -.6 }
@@ -712,6 +733,7 @@ function App() {
     {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
     {running && <div className="artifact-hunt">CACHE <strong>{artifactHits.size}/6</strong><small>FIND THE KEYS</small></div>}
     {running && <div className="hunter-hunt">HUNTERS <strong>4</strong><small>DO NOT TOUCH THE LIGHT</small></div>}
+    {running && <div className="gust-hunt">GUST WALLS <strong>3</strong><small>READ THE ARROWS</small></div>}
     {running && <section className="heat-meter" aria-label="Momentum heat"><span>FLOW HEAT</span><strong>{Math.round(heat)}%</strong><div><i style={{ width: `${heat}%` }} /></div><small>{heat > 70 ? 'OVERDRIVE' : 'KEEP THE LINE'}</small></section>}
     {running && <section className="route-radar" aria-label="Next ledge radar"><span>NEXT LEDGE</span><strong>{Math.floor(nextPlatform.y * 10)}M · {nextPlatform.kind.toUpperCase()}</strong><div><i style={{ left: `${radarX}%` }} /></div><small>{nextPlatform.x > .5 ? 'STEER RIGHT' : nextPlatform.x < -.5 ? 'STEER LEFT' : 'CENTER LINE'}</small></section>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
