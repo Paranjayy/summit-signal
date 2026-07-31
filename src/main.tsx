@@ -533,7 +533,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; grappleVisual.current = 0; hunterCooldown.current = 0; phaseCooldown.current = 0; phaseVisual.current = 0; phaseLatch.current = false; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
 
   useEffect(() => {
-    const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
+    const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12; cameraDistance.current = 15.5 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
     const up = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = false; keys.current[code] = false }
     const clearKeys = () => { keys.current = {}; touchKeys.current.clear() }
     const canvas = document.querySelector('canvas')
@@ -581,6 +581,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     const wantsBurst = Boolean(keys.current.shift || keys.current.shiftleft || keys.current.shiftright || gamepad?.buttons[2]?.pressed)
     const wantsGrapple = Boolean(keys.current.e || gamepad?.buttons[3]?.pressed)
     const wantsPhase = Boolean(keys.current.q || gamepad?.buttons[1]?.pressed)
+    if (viewMode.current === 'third') { if (keys.current.z) cameraDistance.current = THREE.MathUtils.damp(cameraDistance.current, 7.5, 8, dt); if (keys.current.x) cameraDistance.current = THREE.MathUtils.damp(cameraDistance.current, 24, 8, dt) }
     if (!wantsJump) { jumpLatch.current = false; jumpBufferTimer.current = 0 } else if (!jumpLatch.current) jumpBufferTimer.current = .12
     coyoteTimer.current = grounded.current ? .12 : Math.max(0, coyoteTimer.current - dt)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
@@ -958,7 +959,7 @@ function App() {
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><button className="reroll-card" onClick={rerollCards} disabled={cardRerolls <= 0}>REROLL HAND · {cardRerolls ? '1 LEFT' : 'SPENT'}</button><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST · REROLL BURNS THE HAND</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
-    {running && <div className="camera-hint">C / RECENTER · V / {cameraMode === 'third' ? 'FIRST PERSON' : 'CHASE CAM'} · WHEEL / ZOOM</div>}
+    {running && <div className="camera-hint">C / RECENTER · V / {cameraMode === 'third' ? 'FIRST PERSON' : 'CHASE CAM'} · WHEEL / ZOOM · Z/X</div>}
     <button className="sound-toggle" onClick={toggleSound} aria-label={soundOn ? 'Mute signal audio' : 'Enable signal audio'}>{soundOn ? 'AUDIO ON' : 'AUDIO OFF'}</button>
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
