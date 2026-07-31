@@ -254,6 +254,16 @@ function CheckpointBeacon({ position, mode }: { position: [number, number, numbe
   </group>
 }
 
+function SignalGrid({ mode }: { mode: RunMode }) {
+  const material = useRef<THREE.ShaderMaterial>(null)
+  const color = mode === 'stormline' ? new THREE.Color('#ff5966') : mode === 'zenith' ? new THREE.Color('#8ddfff') : new THREE.Color('#dfb65f')
+  useFrame((state) => { if (material.current) material.current.uniforms.uTime.value = state.clock.elapsedTime })
+  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.22, -45]}>
+    <planeGeometry args={[360, 360, 1, 1]} />
+    <shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uColor: { value: color } }} vertexShader={'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }'} fragmentShader={'uniform float uTime; uniform vec3 uColor; varying vec2 vUv; void main(){ vec2 cell=abs(fract(vUv*34.0)-.5); float lines=max(step(.475,cell.x),step(.475,cell.y)); float sweep=1.0-smoothstep(.0,.16,abs(fract(vUv.y+uTime*.018)-.5)); float edge=1.0-smoothstep(.15,.9,distance(vUv,vec2(.5))); float alpha=(lines*.13+sweep*.035)*edge; gl_FragColor=vec4(uColor,alpha); }'} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+  </mesh>
+}
+
 function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -634,6 +644,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
     <Sparkles count={85 + Math.floor(heat / 10) * 8} scale={[28, 30, 25]} size={2.5 + heat / 70} speed={.22 + heat / 180} color={heat > 70 ? '#ff9a67' : '#fff0bf'} />
     <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
+    <SignalGrid mode={mode} />
     {platforms.map((p, i) => <PlatformMesh platform={p} key={i} />)}
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {signalArtifacts.map((artifact, i) => <SignalArtifactMesh artifact={artifact} collected={collectedArtifacts.has(i)} key={`artifact-${i}`} />)}
