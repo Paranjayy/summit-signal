@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import './styles.css'
 
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
+type SignalShard = { x: number; y: number; z: number }
 
 const platforms: Platform[] = [
   { x: 0, y: 0, z: 0, width: 7, depth: 7, kind: 'scaffold' },
@@ -17,6 +18,14 @@ const platforms: Platform[] = [
   { x: -0.9, y: 17.8, z: -8.1, width: 3.2, depth: 2.6, kind: 'sign' },
   { x: 3.2, y: 21.0, z: -9.4, width: 3.8, depth: 2.7, kind: 'scaffold' },
   { x: 0, y: 24.6, z: -10.8, width: 4.8, depth: 3.5, kind: 'cloud' },
+]
+
+const signalShards: SignalShard[] = [
+  { x: -2.8, y: 4.15, z: -1.3 },
+  { x: 1.4, y: 6.75, z: -3.1 },
+  { x: 0.6, y: 12.6, z: -5.6 },
+  { x: -0.9, y: 18.9, z: -8.1 },
+  { x: 0, y: 25.7, z: -10.8 },
 ]
 
 function PlatformMesh({ platform }: { platform: Platform }) {
@@ -32,12 +41,20 @@ function PlatformMesh({ platform }: { platform: Platform }) {
   </group>
 }
 
-function Player({ running, onProgress, onFall }: { running: boolean; onProgress: (height: number) => void; onFall: () => void }) {
+function SignalShardMesh({ shard, collected }: { shard: SignalShard; collected: boolean }) {
+  if (collected) return null
+  return <Float speed={2.2} rotationIntensity={.6} floatIntensity={.45} position={[shard.x, shard.y, shard.z]}>
+    <mesh castShadow><octahedronGeometry args={[.24, 0]} /><meshStandardMaterial color="#ec4f2d" emissive="#9f2817" emissiveIntensity={1.2} metalness={.75} roughness={.22} /></mesh>
+  </Float>
+}
+
+function Player({ running, onProgress, onFall, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, 1.1, 0))
   const keys = useRef<Record<string, boolean>>({})
   const nextReport = useRef(0)
+  const claimedShards = useRef(new Set<number>())
   const reset = () => { position.current.set(0, 1.1, 0); velocity.current.set(0, 0, 0) }
 
   useEffect(() => {
@@ -53,7 +70,7 @@ function Player({ running, onProgress, onFall }: { running: boolean; onProgress:
     const steer = (Number(Boolean(keys.current.d || keys.current.arrowright)) - Number(Boolean(keys.current.a || keys.current.arrowleft)))
     const pace = (Number(Boolean(keys.current.w || keys.current.arrowup)) - Number(Boolean(keys.current.s || keys.current.arrowdown)))
     velocity.current.x = THREE.MathUtils.damp(velocity.current.x, steer * 5.1, 10, dt)
-    velocity.current.z = THREE.MathUtils.damp(velocity.current.z, pace * 2.4 - 1.7, 7, dt)
+    velocity.current.z = THREE.MathUtils.damp(velocity.current.z, pace * 3.8, 9, dt)
     velocity.current.y -= 13.8 * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
@@ -73,6 +90,12 @@ function Player({ running, onProgress, onFall }: { running: boolean; onProgress:
     const cameraHeight = Math.max(4.5, position.current.y + 7.5)
     state.camera.position.lerp(new THREE.Vector3(position.current.x * .22 + 9, cameraHeight, 14), .08)
     state.camera.lookAt(position.current.x * .32, Math.max(1.4, position.current.y + 1.4), -2)
+    signalShards.forEach((shard, index) => {
+      if (!claimedShards.current.has(index) && position.current.distanceTo(new THREE.Vector3(shard.x, shard.y, shard.z)) < .85) {
+        claimedShards.current.add(index)
+        onCollect(index)
+      }
+    })
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
   return <group ref={body} position={[0, 1.1, 0]} castShadow>
@@ -82,7 +105,7 @@ function Player({ running, onProgress, onFall }: { running: boolean; onProgress:
   </group>
 }
 
-function World({ running, onProgress, onFall }: { running: boolean; onProgress: (height: number) => void; onFall: () => void }) {
+function World({ running, onProgress, onFall, collectedShards, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void }) {
   const cables = useMemo(() => Array.from({ length: 15 }, (_, i) => i), [])
   return <Canvas shadows camera={{ fov: 45, position: [9, 7, 14] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
@@ -95,9 +118,10 @@ function World({ running, onProgress, onFall }: { running: boolean; onProgress: 
     <Sparkles count={85} scale={[28, 30, 25]} size={2.5} speed={.22} color="#fff0bf" />
     <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -4]}><planeGeometry args={[110, 110]} /><meshStandardMaterial color="#546451" roughness={1} /></mesh>
     {platforms.map((p, i) => <PlatformMesh platform={p} key={i} />)}
+    {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 3 - 1) * 7, 8 + i * 1.7, -6 - i * .7]} rotation={[.15, 0, (i % 2 ? .2 : -.2)]}><cylinderGeometry args={[.025, .025, 15, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} onProgress={onProgress} onFall={onFall} />
+    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} />
     <Html position={[0, 25.5, -10.8]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -106,15 +130,16 @@ function App() {
   const [running, setRunning] = useState(false)
   const [height, setHeight] = useState(0)
   const [falls, setFalls] = useState(0)
+  const [collectedShards, setCollectedShards] = useState<Set<number>>(new Set())
   const [best, setBest] = useState(() => Number(localStorage.getItem('summit-signal-best') || 0))
   const progress = Math.min(100, Math.round(height / 24.6 * 100))
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   return <main>
-    <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} />
+    <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
-    <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div></section>
+    <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="route"><span>ROUTE 01 / CLOUDLINE</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!running && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Miss once, learn fast, go again.</p><button onClick={() => setRunning(true)}>BEGIN ASCENT <span>↗</span></button><small>WASD / ARROWS TO MOVE · R TO RESET</small></section>}
+    {!running && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Miss once, learn fast, go again. Collect the red signal shards to complete the route.</p><button onClick={() => setRunning(true)}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · R RESET</small></section>}
     {running && <button className="pause" onClick={() => setRunning(false)}>PAUSE</button>}
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
