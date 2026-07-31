@@ -670,6 +670,7 @@ function App() {
   const [runGrade, setRunGrade] = useState('C')
   const [soundOn, setSoundOn] = useState(true)
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
+  const flowMultiplier = 1 + Math.min(2, Math.floor(combo / 5) * .25)
   const biome = getBiome(height, courseHeight)
   const modeLabel = getModeLabel(mode)
   const challengeCode = `SS-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${modeLabel.slice(0, 3)}`
@@ -717,8 +718,8 @@ function App() {
     setFalls(v => v + 1); setCombo(0); setHeat(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); cue('fail'); return false
   }
   const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setHeat(current => Math.min(100, current + 10)); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false); cue('checkpoint') }
-  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setHeat(current => Math.min(100, current + 22)); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`); cue('gate') }
-  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · +2 STREAK`); cue('shard') }
+  const handleGate = (index: number) => { const cut = 1.8 * flowMultiplier; setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setHeat(current => Math.min(100, current + 22)); setStartedAt(current => current + cut * 1000); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · FLOW x${flowMultiplier.toFixed(2)} · -${cut.toFixed(1)}S`); cue('gate') }
+  const handleArtifact = (index: number) => { setArtifactHits(current => new Set(current).add(index)); setCombo(current => current + 2); setHeat(current => Math.min(100, current + 12 * flowMultiplier)); setSignalFlash(`ARTIFACT CACHE ${index + 1}/6 · FLOW x${flowMultiplier.toFixed(2)}`); cue('shard') }
   const toggleSound = () => { setSoundOn(current => { muted.current = current; return !current }) }
   const copyChallengeCode = () => { void navigator.clipboard?.writeText(challengeCode); setSignalFlash(`RUN CODE COPIED · ${challengeCode}`) }
   return <main className={heat > 70 ? 'heat-hot' : ''}>
@@ -726,7 +727,7 @@ function App() {
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
-    {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
+    {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')} · FLOW x{flowMultiplier.toFixed(2)}</small></section>}
     {running && <div className="perfect-count">PERFECT <strong>{perfectLands.toString().padStart(2, '0')}</strong><small>PRECISION LANDS</small></div>}
     {running && <div className="shortcut-count">SHORTCUTS <strong>{shortcutLands.toString().padStart(2, '0')}</strong><small>RISK / REWARD</small></div>}
     {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
