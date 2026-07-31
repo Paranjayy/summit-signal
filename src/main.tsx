@@ -202,6 +202,7 @@ function StormFlash({ active }: { active: boolean }) {
 
 function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
+  const grappleBeam = useRef<THREE.Mesh>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
@@ -223,11 +224,13 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   const jumpBufferTimer = useRef(0)
   const grappleCooldown = useRef(0)
   const grappleLatch = useRef(false)
+  const grappleVisual = useRef(0)
+  const grappleTarget = useRef(new THREE.Vector3())
   const runClock = useRef(0)
   const nextGhostSample = useRef(0)
   const cameraShake = useRef(0)
   const checkpoint = useRef(new THREE.Vector3(0, .34, 0))
-  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
+  const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; grappleVisual.current = 0; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
@@ -301,6 +304,8 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
         grounded.current = false
         grappleCooldown.current = 5
         grappleLatch.current = true
+        grappleTarget.current.set(target.x, target.platform.y + .34, target.platform.z)
+        grappleVisual.current = .22
         cameraShake.current = Math.max(cameraShake.current, .1)
         onGrapple()
       }
@@ -335,6 +340,18 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     }
     if (position.current.y < -5) { const forgiven = onFall(); reset(true); if (forgiven) setTimeout(() => onProgress(Math.max(0, checkpoint.current.y)), 0) }
     body.current.position.copy(position.current)
+    if (grappleBeam.current) {
+      if (grappleVisual.current > 0) {
+        const beamStart = new THREE.Vector3(0, .8, 0)
+        const beamDirection = grappleTarget.current.clone().sub(position.current).sub(beamStart)
+        const beamLength = beamDirection.length()
+        grappleBeam.current.visible = true
+        grappleBeam.current.position.copy(beamStart).addScaledVector(beamDirection, .5)
+        grappleBeam.current.scale.set(1, beamLength, 1)
+        grappleBeam.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDirection.normalize())
+        grappleVisual.current = Math.max(0, grappleVisual.current - dt)
+      } else grappleBeam.current.visible = false
+    }
     cameraShake.current = Math.max(0, cameraShake.current - dt * 1.5)
     if (runClock.current >= nextGhostSample.current) { onGhostFrame({ t: runClock.current, x: position.current.x, y: position.current.y, z: position.current.z }); nextGhostSample.current = runClock.current + .08 }
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
@@ -381,6 +398,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
   return <group ref={body} position={[0, .34, 0]} castShadow>
+    <mesh ref={grappleBeam} visible={false}><cylinderGeometry args={[.025, .025, 1, 6]} /><meshStandardMaterial color="#72edf1" emissive="#30cbd0" emissiveIntensity={2} transparent opacity={.8} depthWrite={false} /></mesh>
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
     <mesh position={[0, 1.12, -.23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
