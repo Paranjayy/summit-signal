@@ -306,6 +306,15 @@ function RainField({ active }: { active: boolean }) {
   return <group ref={rain}>{drops.map((drop, index) => <mesh key={index} position={[drop.x, drop.y, drop.z]} rotation={[.16, 0, 0]}><boxGeometry args={[.018, drop.length, .018]} /><meshStandardMaterial color="#b5d8e9" emissive="#6a9dbd" emissiveIntensity={.45} transparent opacity={.36} depthWrite={false} /></mesh>)}</group>
 }
 
+function ZenithAurora({ active }: { active: boolean }) {
+  const aurora = useRef<THREE.Group>(null)
+  useFrame((state) => { if (aurora.current && active) { aurora.current.rotation.y = state.clock.elapsedTime * .08; aurora.current.rotation.z = Math.sin(state.clock.elapsedTime * .18) * .08 } })
+  if (!active) return null
+  return <group ref={aurora} position={[0, 82, -84]}>
+    {[0, 1, 2].map((index) => <mesh key={index} rotation={[Math.PI / 2 + index * .08, index * .32, index * .25]}><torusGeometry args={[11 + index * 2.4, .16 - index * .025, 10, 64]} /><meshStandardMaterial color={index % 2 ? '#8ddfff' : '#c18cff'} emissive={index % 2 ? '#58c9ef' : '#8d53d2'} emissiveIntensity={1.8} transparent opacity={.25} depthWrite={false} /></mesh>)}
+  </group>
+}
+
 function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -688,6 +697,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <fog attach="fog" args={[palette.fog, 34, 190]} />
     <AtmosphereController heat={heat} mutator={mutator} />
     <RainField active={mode === 'stormline'} />
+    <ZenithAurora active={mode === 'zenith'} />
     <ambientLight intensity={1.55} color={palette.ambient} />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
