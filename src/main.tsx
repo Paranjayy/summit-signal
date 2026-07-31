@@ -890,6 +890,11 @@ function App() {
   useEffect(() => {
     if (running) setSignalFlash(`${biomeLabels[biome]} // ROUTE SIGNAL LOCKED`)
   }, [biome, running])
+  useEffect(() => {
+    if (!running || !startedAt) return
+    setSignalFlash(`${routeEventInfo.title} // ${routeEventInfo.detail}`)
+    cue('burst')
+  }, [routeEvent, running, startedAt, routeEventInfo.detail, routeEventInfo.title])
   const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); recording.current = []; setRunId(current => current + 1); setCameraMode('third'); setRunGrade('C'); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setPerfectLands(0); setShortcutLands(0); setAirGateHits(0); setCardRerolls(1); setHeat(0); setBurstReady(true); setGrappleReady(true); setPhaseReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setArtifactHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
