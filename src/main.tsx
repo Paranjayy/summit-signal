@@ -433,6 +433,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
+  const touchKeys = useRef(new Set<string>())
   const nextReport = useRef(0)
   const claimedShards = useRef(new Set<number>())
   const claimedGates = useRef(new Set<number>())
@@ -466,10 +467,10 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   useEffect(() => {
     const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } if (key === 'v' && !event.repeat) { viewMode.current = viewMode.current === 'third' ? 'first' : 'third'; onViewChange(viewMode.current) } }
     const up = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = false; keys.current[code] = false }
-    const clearKeys = () => { keys.current = {} }
+    const clearKeys = () => { keys.current = {}; touchKeys.current.clear() }
     const canvas = document.querySelector('canvas')
-    const touchDown = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = true; event.preventDefault() } }
-    const touchUp = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = false; event.preventDefault() } }
+    const touchDown = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = true; touchKeys.current.add(key); event.preventDefault() } }
+    const touchUp = (event: PointerEvent) => { const target = (event.target as HTMLElement).closest<HTMLElement>('[data-game-key]'); const key = target?.dataset.gameKey; if (key) { keys.current[key] = false; touchKeys.current.delete(key) } else { touchKeys.current.forEach(activeKey => { keys.current[activeKey] = false }); touchKeys.current.clear() } }
     const handlePointerDown = (event: PointerEvent) => { dragging.current = true; previousPointer.current = { x: event.clientX, y: event.clientY }; if (document.pointerLockElement !== canvas) canvas?.requestPointerLock?.() }
     const handlePointerUp = () => { dragging.current = false }
     const handleMouseMove = (event: MouseEvent) => {
