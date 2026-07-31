@@ -136,6 +136,12 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
   const sunColor = stormline ? '#ef6c4d' : zenith ? '#b9dcff' : '#f1c171'
   const skylineColor = stormline ? '#26343d' : zenith ? '#40566b' : '#313d42'
   const skyline = useMemo(() => Array.from({ length: 14 }, (_, index) => ({ x: (index % 2 ? 1 : -1) * (16 + (index % 5) * 4), y: 7 + (index % 4) * 3.5, z: -18 - index * 6, width: 2.5 + (index % 3) * 1.3, depth: 2.2 + (index % 2), height: 12 + (index % 5) * 5 })), [])
+  const billboards = useMemo(() => [
+    { x: -13, y: 18, z: -26, color: '#58e4dc', label: 'FLOW // 01' },
+    { x: 14, y: 39, z: -51, color: '#ff6b4b', label: 'SIGNAL // 02' },
+    { x: -15, y: 62, z: -76, color: '#c77dff', label: 'NIGHT // 03' },
+    { x: 13, y: 84, z: -101, color: '#ffd27a', label: 'CORE // 04' },
+  ], [])
   const gates = useMemo(() => Array.from({ length: 4 }, (_, index) => ({ y: 18 + index * 23, z: -13 - index * 25, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
   return <group>
     <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={.5} roughness={1} /></mesh>
@@ -143,6 +149,13 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
       <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? skylineColor : (stormline ? '#3e4047' : zenith ? '#52687a' : '#46504c')} roughness={.85} metalness={.3} /></mesh>
       <mesh position={[0, tower.height / 2 + 1.5, 0]}><cylinderGeometry args={[.05, .05, 3, 6]} /><meshStandardMaterial color="#d7ad47" emissive="#d7ad47" emissiveIntensity={.7} /></mesh>
       {[-1, 0, 1].map((windowIndex) => <mesh key={windowIndex} position={[windowIndex * .48, 0, tower.depth / 2 + .02]}><boxGeometry args={[.22, .12, .04]} /><meshStandardMaterial color="#e9b957" emissive="#e9b957" emissiveIntensity={1.3} /></mesh>)}
+      {[.28, -.18].map((band, bandIndex) => <mesh key={`band-${bandIndex}`} position={[0, tower.height * band, tower.depth / 2 + .035]}><boxGeometry args={[tower.width * .72, .035, .03]} /><meshStandardMaterial color={bandIndex ? '#58e4dc' : '#ff6b4b'} emissive={bandIndex ? '#58e4dc' : '#ff6b4b'} emissiveIntensity={1.8} /></mesh>)}
+    </group>)}
+    {billboards.map((board, index) => <group key={`billboard-${index}`} position={[board.x, board.y, board.z]} rotation={[0, index % 2 ? -.16 : .16, 0]}>
+      <mesh castShadow><boxGeometry args={[5.4, 2.25, .16]} /><meshStandardMaterial color="#151b25" metalness={.7} roughness={.25} /></mesh>
+      <mesh position={[0, 0, .1]}><planeGeometry args={[4.9, 1.75]} /><meshStandardMaterial color={board.color} emissive={board.color} emissiveIntensity={1.4} /></mesh>
+      <Html transform position={[0, 0, .2]} distanceFactor={10}><div className="world-billboard" style={{ color: board.color }}>{board.label}</div></Html>
+      <mesh position={[0, -2.1, 0]}><cylinderGeometry args={[.09, .09, 4.2, 8]} /><meshStandardMaterial color="#202631" metalness={.8} roughness={.3} /></mesh>
     </group>)}
     {[-1, 1].map((side) => <mesh key={side} position={[side * 31, 7, -62]} rotation={[0, 0, side * .22]}><coneGeometry args={[18, 34, 5]} /><meshStandardMaterial color="#35443f" roughness={1} /></mesh>)}
     {gates.map((gate, index) => <group key={`gate-${index}`} position={[0, gate.y, gate.z]} rotation={[0, index * .12, 0]}>
@@ -501,6 +514,10 @@ function App() {
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
   useEffect(() => {
+    const contractBest = Number(localStorage.getItem(`summit-signal-speedrun-best-${mode}`) || 0)
+    setSpeedrunBest(contractBest)
+  }, [mode])
+  useEffect(() => {
     if (!running) return
     const cool = window.setInterval(() => setHeat(current => Math.max(0, current - .7)), 200)
     return () => window.clearInterval(cool)
@@ -517,7 +534,7 @@ function App() {
     setRunning(false)
     if (recording.current.length > 1) { setGhostPath(recording.current); localStorage.setItem('summit-signal-echo', JSON.stringify(recording.current)) }
     cue('finish')
-    if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
+    if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem(`summit-signal-speedrun-best-${mode}`, String(time)); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
   const chooseCard = (card: SignalCard) => { setActiveCards(current => [...current, card]); setModifiers(current => mergeModifiers(current, card)); setPendingCards([]); setRunning(true); setSignalFlash(`${card.title} ONLINE · KEEP CLIMBING`) }
   useEffect(() => {
