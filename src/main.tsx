@@ -299,6 +299,8 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   const body = useRef<THREE.Group>(null)
   const grappleBeam = useRef<THREE.Mesh>(null)
   const phaseShell = useRef<THREE.Mesh>(null)
+  const landingRing = useRef<THREE.Mesh>(null)
+  const landingPulse = useRef(0)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
@@ -385,6 +387,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     grappleCooldown.current = Math.max(0, grappleCooldown.current - dt)
     phaseCooldown.current = Math.max(0, phaseCooldown.current - dt)
     phaseVisual.current = Math.max(0, phaseVisual.current - dt)
+    landingPulse.current = Math.max(0, landingPulse.current - dt * 2.8)
     if (!wantsBurst) burstLatch.current = false
     if (!wantsGrapple) grappleLatch.current = false
     if (!wantsPhase) phaseLatch.current = false
@@ -445,6 +448,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
         const onTop = crossedTop || nearLedge
         if (onTop && withinX && withinZ) {
           const perfectLanding = Math.abs(position.current.x - platformX) < p.width * .22 && Math.abs(position.current.z - p.z) < p.depth * .22 && velocity.current.y < -6
+          if (perfectLanding) landingPulse.current = 1
           position.current.y = p.y + .34; position.current.x = platformX; velocity.current.y = 0; grounded.current = true; cameraShake.current = Math.max(cameraShake.current, perfectLanding ? .2 : .14); onLand(perfectLanding)
           if (p.y > checkpoint.current.y + 7) { checkpoint.current.set(platformX, p.y + .34, p.z); onCheckpoint(p.y) }
           break
@@ -466,6 +470,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     }
     body.current.position.copy(position.current)
     if (phaseShell.current) { phaseShell.current.visible = phaseVisual.current > 0; phaseShell.current.rotation.y += dt * 3.2; phaseShell.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 16) * .06) }
+    if (landingRing.current) { landingRing.current.visible = landingPulse.current > 0; landingRing.current.scale.setScalar(1 + (1 - landingPulse.current) * 2.4); const material = landingRing.current.material as THREE.MeshStandardMaterial; material.opacity = landingPulse.current * .9 }
     if (grappleBeam.current) {
       if (grappleVisual.current > 0) {
         const beamStart = new THREE.Vector3(0, .8, 0)
@@ -525,6 +530,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   })
   return <group ref={body} position={[0, .34, 0]} castShadow>
     <mesh ref={phaseShell} visible={false} position={[0, .68, 0]}><sphereGeometry args={[.72, 16, 12]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={2.4} transparent opacity={.24} depthWrite={false} wireframe /></mesh>
+    <mesh ref={landingRing} visible={false} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.31, 0]}><torusGeometry args={[.42, .045, 8, 32]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={2.2} transparent opacity={0} depthWrite={false} /></mesh>
     <mesh ref={grappleBeam} visible={false}><cylinderGeometry args={[.025, .025, 1, 6]} /><meshStandardMaterial color="#72edf1" emissive="#30cbd0" emissiveIntensity={2} transparent opacity={.8} depthWrite={false} /></mesh>
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
