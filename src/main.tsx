@@ -377,6 +377,8 @@ function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, o
   const phaseShell = useRef<THREE.Mesh>(null)
   const landingRing = useRef<THREE.Mesh>(null)
   const landingPulse = useRef(0)
+  const trailA = useRef<THREE.Mesh>(null)
+  const trailB = useRef<THREE.Mesh>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
@@ -556,6 +558,9 @@ function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, o
     body.current.position.copy(position.current)
     if (phaseShell.current) { phaseShell.current.visible = phaseVisual.current > 0; phaseShell.current.rotation.y += dt * 3.2; phaseShell.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 16) * .06) }
     if (landingRing.current) { landingRing.current.visible = landingPulse.current > 0; landingRing.current.scale.setScalar(1 + (1 - landingPulse.current) * 2.4); const material = landingRing.current.material as THREE.MeshStandardMaterial; material.opacity = landingPulse.current * .9 }
+    const speed = Math.hypot(velocity.current.x, velocity.current.z)
+    const trailOpacity = THREE.MathUtils.clamp((speed - 3.8) / 5.5, 0, 1) * .48
+    ;[trailA.current, trailB.current].forEach((trail, index) => { if (trail) { trail.visible = trailOpacity > 0; trail.position.set((index ? -.18 : .18), .62 + index * .16, .42 + index * .14); trail.scale.set(1, 1, 1 + speed * .12); (trail.material as THREE.MeshStandardMaterial).opacity = trailOpacity } })
     if (grappleBeam.current) {
       if (grappleVisual.current > 0) {
         const beamStart = new THREE.Vector3(0, .8, 0)
@@ -616,6 +621,8 @@ function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, o
   return <group ref={body} position={[0, .34, 0]} castShadow>
     <mesh ref={phaseShell} visible={false} position={[0, .68, 0]}><sphereGeometry args={[.72, 16, 12]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={2.4} transparent opacity={.24} depthWrite={false} wireframe /></mesh>
     <mesh ref={landingRing} visible={false} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.31, 0]}><torusGeometry args={[.42, .045, 8, 32]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={2.2} transparent opacity={0} depthWrite={false} /></mesh>
+    <mesh ref={trailA} visible={false} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[.025, .11, 1.2, 6]} /><meshStandardMaterial color="#ff8e68" emissive="#d84e3c" emissiveIntensity={1.8} transparent opacity={0} depthWrite={false} /></mesh>
+    <mesh ref={trailB} visible={false} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[.02, .08, 1, 6]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={1.7} transparent opacity={0} depthWrite={false} /></mesh>
     <mesh ref={grappleBeam} visible={false}><cylinderGeometry args={[.025, .025, 1, 6]} /><meshStandardMaterial color="#72edf1" emissive="#30cbd0" emissiveIntensity={2} transparent opacity={.8} depthWrite={false} /></mesh>
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
