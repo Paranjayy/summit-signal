@@ -491,6 +491,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   const phaseShell = useRef<THREE.Mesh>(null)
   const landingRing = useRef<THREE.Mesh>(null)
   const landingPulse = useRef(0)
+  const overdriveOrbit = useRef<THREE.Group>(null)
   const trailA = useRef<THREE.Mesh>(null)
   const trailB = useRef<THREE.Mesh>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
@@ -703,6 +704,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
       } else grappleBeam.current.visible = false
     }
     cameraShake.current = Math.max(0, cameraShake.current - dt * 1.5)
+    if (overdriveOrbit.current) { overdriveOrbit.current.visible = heat > 70; overdriveOrbit.current.rotation.y += dt * 2.6; overdriveOrbit.current.rotation.z = Math.sin(state.clock.elapsedTime * 2.4) * .12 }
     if (runClock.current >= nextGhostSample.current) { onGhostFrame({ t: runClock.current, x: position.current.x, y: position.current.y, z: position.current.z }); nextGhostSample.current = runClock.current + .08 }
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
     if (Math.abs(velocity.current.x) + Math.abs(velocity.current.z) > .08) body.current.rotation.y = THREE.MathUtils.damp(body.current.rotation.y, Math.atan2(velocity.current.x, -velocity.current.z), 10, dt)
@@ -756,7 +758,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
     <mesh position={[0, 1.12, -.23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
-    {heat > 70 && <><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .04, 0]}><torusGeometry args={[.62, .035, 8, 32]} /><meshStandardMaterial color="#ff744e" emissive="#d6422f" emissiveIntensity={1.8} transparent opacity={.78} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .08, 0]}><torusGeometry args={[.9, .018, 8, 32]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={1.5} transparent opacity={.6} /></mesh><pointLight position={[0, .7, 0]} color="#ff6e4c" intensity={.6} distance={3.5} /></>}
+    <group ref={overdriveOrbit} visible={false} position={[0, .78, 0]}><mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.72, .035, 8, 32]} /><meshStandardMaterial color="#ff744e" emissive="#d6422f" emissiveIntensity={1.8} transparent opacity={.78} /></mesh><mesh position={[.88, 0, 0]}><octahedronGeometry args={[.1, 0]} /><meshStandardMaterial color="#ffd27a" emissive="#ec9146" emissiveIntensity={2.2} /></mesh><mesh position={[-.44, .08, .76]}><octahedronGeometry args={[.07, 0]} /><meshStandardMaterial color="#74e7e5" emissive="#36c9cb" emissiveIntensity={2.1} /></mesh><pointLight position={[0, -.08, 0]} color="#ff6e4c" intensity={.8} distance={3.5} /></group>
   </group>
 }
 
