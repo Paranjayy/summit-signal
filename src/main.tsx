@@ -295,6 +295,17 @@ function AtmosphereController({ heat, mutator }: { heat: number; mutator: DailyM
   return null
 }
 
+function RainField({ active }: { active: boolean }) {
+  const rain = useRef<THREE.Group>(null)
+  const drops = useMemo(() => Array.from({ length: 72 }, (_, index) => ({ x: ((index * 17) % 29) - 14, y: (index * 13) % 34 + 2, z: -((index * 11) % 70) - 8, length: .45 + (index % 4) * .16 })), [])
+  useFrame((_, delta) => {
+    if (!rain.current || !active) return
+    rain.current.children.forEach((drop, index) => { drop.position.y -= delta * (11 + (index % 5) * 1.8); if (drop.position.y < -1) drop.position.y = 34 + (index % 7) })
+  })
+  if (!active) return null
+  return <group ref={rain}>{drops.map((drop, index) => <mesh key={index} position={[drop.x, drop.y, drop.z]} rotation={[.16, 0, 0]}><boxGeometry args={[.018, drop.length, .018]} /><meshStandardMaterial color="#b5d8e9" emissive="#6a9dbd" emissiveIntensity={.45} transparent opacity={.36} depthWrite={false} /></mesh>)}</group>
+}
+
 function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -676,6 +687,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <color attach="background" args={[palette.sky]} />
     <fog attach="fog" args={[palette.fog, 34, 190]} />
     <AtmosphereController heat={heat} mutator={mutator} />
+    <RainField active={mode === 'stormline'} />
     <ambientLight intensity={1.55} color={palette.ambient} />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
