@@ -402,7 +402,7 @@ function SummitBeacon({ active }: { active: boolean }) {
   </group>
 }
 
-function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; mode: RunMode; mutator: DailyMutator; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number, airborne: boolean) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
+function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; runId: number; mode: RunMode; mutator: DailyMutator; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number, airborne: boolean) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const grappleBeam = useRef<THREE.Mesh>(null)
   const phaseShell = useRef<THREE.Mesh>(null)
@@ -472,7 +472,7 @@ function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, o
     viewMode.current = 'third'
     runClock.current = 0
     nextGhostSample.current = 0
-  }, [running])
+  }, [runId])
 
   useFrame((state, delta) => {
     if (!body.current || !running) return
@@ -696,7 +696,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
-    <Player running={running} mode={mode} mutator={mutator} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
+    <Player running={running} runId={runId} mode={mode} mutator={mutator} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
