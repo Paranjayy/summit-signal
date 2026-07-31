@@ -68,8 +68,11 @@ function Player({ running, onProgress, onFall }: { running: boolean; onProgress:
     if (position.current.y < -5) { onFall(); reset() }
     body.current.position.copy(position.current)
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
-    state.camera.position.lerp(new THREE.Vector3(position.current.x * .22 + 9, position.current.y + 7.5, position.current.z + 14), .035)
-    state.camera.lookAt(position.current.x * .32, position.current.y + 1.4, position.current.z - 2)
+    // Keep the lens on the playable lane. The avatar can drift through the
+    // level's depth, but the camera must never follow it into the void after a miss.
+    const cameraHeight = Math.max(4.5, position.current.y + 7.5)
+    state.camera.position.lerp(new THREE.Vector3(position.current.x * .22 + 9, cameraHeight, 14), .08)
+    state.camera.lookAt(position.current.x * .32, Math.max(1.4, position.current.y + 1.4), -2)
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
   return <group ref={body} position={[0, 1.1, 0]} castShadow>
