@@ -211,6 +211,16 @@ function SkyFreighter({ position, color, phase }: { position: [number, number, n
   </group>
 }
 
+function GateRotor({ y, z, color, index }: { y: number; z: number; color: string; index: number }) {
+  const rotor = useRef<THREE.Group>(null)
+  useFrame((state) => { if (rotor.current) rotor.current.rotation.z = state.clock.elapsedTime * (index % 2 ? -1.1 : 1.1) })
+  return <group ref={rotor} position={[0, y, z]}>
+    <mesh><boxGeometry args={[8.8, .06, .08]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} transparent opacity={.76} depthWrite={false} /></mesh>
+    <mesh rotation={[0, 0, Math.PI / 2]}><boxGeometry args={[8.8, .035, .05]} /><meshStandardMaterial color="#f8ecda" emissive="#fff0bf" emissiveIntensity={.85} transparent opacity={.4} depthWrite={false} /></mesh>
+    <pointLight color={color} intensity={1.3} distance={9} decay={2} />
+  </group>
+}
+
 function WorldBackdrop({ mode }: { mode: RunMode }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -251,6 +261,7 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
       <mesh><torusGeometry args={[5.5 + index * .35, .12, 12, 48]} /><meshStandardMaterial color={gate.color} emissive={gate.color} emissiveIntensity={.65} metalness={.55} roughness={.28} /></mesh>
       <mesh position={[0, -5.2, 0]}><boxGeometry args={[.18, 10.4, .18]} /><meshStandardMaterial color="#303b3a" metalness={.7} roughness={.35} /></mesh>
     </group>)}
+    {gates.map((gate, index) => <GateRotor key={`gate-rotor-${index}`} y={gate.y} z={gate.z} color={gate.color} index={index} />)}
     <group position={[0, 34, -31]}>
       {[-1, 1].map(side => <mesh key={side} position={[side * 7, 0, 0]}><boxGeometry args={[.45, 13, .45]} /><meshStandardMaterial color="#202631" metalness={.7} roughness={.28} /></mesh>)}
       <mesh position={[0, 6.3, 0]}><boxGeometry args={[14.4, .45, .45]} /><meshStandardMaterial color="#ab5eff" emissive="#7d35d4" emissiveIntensity={1.4} metalness={.45} roughness={.24} /></mesh>
