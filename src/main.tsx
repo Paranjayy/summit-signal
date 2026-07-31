@@ -92,8 +92,11 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
     const steer = (Number(Boolean(keys.current.d || keys.current.arrowright)) - Number(Boolean(keys.current.a || keys.current.arrowleft)))
     const pace = (Number(Boolean(keys.current.w || keys.current.arrowup || keys.current.keyw)) - Number(Boolean(keys.current.s || keys.current.arrowdown || keys.current.keys)))
     const wantsJump = Boolean(keys.current[' '] || keys.current.space || keys.current.spacebar)
-    velocity.current.x = THREE.MathUtils.damp(velocity.current.x, steer * 5.1, 10, dt)
-    velocity.current.z = pace === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, pace * 3.8, 9, dt)
+    // Movement follows the camera's horizontal heading, as expected in a third-person game.
+    const targetX = -Math.sin(yaw.current) * pace * 3.8 + Math.cos(yaw.current) * steer * 5.1
+    const targetZ = -Math.cos(yaw.current) * pace * 3.8 - Math.sin(yaw.current) * steer * 5.1
+    velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
+    velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
     if (wantsJump && grounded.current) { velocity.current.y = 9.6; grounded.current = false }
     if (!grounded.current) velocity.current.y -= 13.8 * dt
     const previousY = position.current.y
@@ -109,6 +112,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
     if (position.current.y < -5) { onFall(); reset() }
     body.current.position.copy(position.current)
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
+    if (Math.abs(velocity.current.x) + Math.abs(velocity.current.z) > .08) body.current.rotation.y = THREE.MathUtils.damp(body.current.rotation.y, Math.atan2(velocity.current.x, -velocity.current.z), 10, dt)
     // Keep the lens on the playable lane. The avatar can drift through the
     // level's depth, but the camera must never follow it into the void after a miss.
     const lookTarget = new THREE.Vector3(position.current.x * .25, Math.max(1.4, position.current.y + 1.45), position.current.z - 2.6)
@@ -127,7 +131,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   return <group ref={body} position={[0, .34, 0]} castShadow>
     <mesh castShadow position={[0, .55, 0]}><capsuleGeometry args={[.23, .65, 6, 12]} /><meshStandardMaterial color="#d8492a" roughness={.45} /></mesh>
     <mesh castShadow position={[0, 1.1, 0]}><sphereGeometry args={[.27, 20, 14]} /><meshStandardMaterial color="#f0a35b" roughness={.6} /></mesh>
-    <mesh position={[0, 1.12, .23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
+    <mesh position={[0, 1.12, -.23]}><boxGeometry args={[.36, .13, .06]} /><meshStandardMaterial color="#20272a" metalness={.8} roughness={.2} /></mesh>
   </group>
 }
 
