@@ -56,14 +56,14 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   const nextReport = useRef(0)
   const claimedShards = useRef(new Set<number>())
   const grounded = useRef(true)
-  const yaw = useRef(.55)
-  const pitch = useRef(.16)
+  const yaw = useRef(.28)
+  const pitch = useRef(.12)
   const dragging = useRef(false)
   const previousPointer = useRef({ x: 0, y: 0 })
   const reset = () => { position.current.set(0, .34, 0); velocity.current.set(0, 0, 0); grounded.current = true }
 
   useEffect(() => {
-    const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset() }
+    const down = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = true; keys.current[code] = true; if (key === 'r') reset(); if (key === 'c') { yaw.current = .28; pitch.current = .12 } }
     const up = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); const code = event.code.toLowerCase(); keys.current[key] = false; keys.current[code] = false }
     const clearKeys = () => { keys.current = {} }
     const canvas = document.querySelector('canvas')
@@ -111,9 +111,9 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
     // Keep the lens on the playable lane. The avatar can drift through the
     // level's depth, but the camera must never follow it into the void after a miss.
-    const lookTarget = new THREE.Vector3(position.current.x * .32, Math.max(1.1, position.current.y + 1.15), position.current.z - 1.8)
-    const cameraDistance = 12.5
-    const cameraOffset = new THREE.Vector3(Math.sin(yaw.current) * cameraDistance, 4.3 + Math.sin(pitch.current) * 5.5, Math.cos(yaw.current) * cameraDistance)
+    const lookTarget = new THREE.Vector3(position.current.x * .25, Math.max(1.4, position.current.y + 1.45), position.current.z - 2.6)
+    const cameraDistance = 15.5
+    const cameraOffset = new THREE.Vector3(Math.sin(yaw.current) * cameraDistance, 5.1 + Math.sin(pitch.current) * 5.5, Math.cos(yaw.current) * cameraDistance)
     state.camera.position.lerp(lookTarget.clone().add(cameraOffset), .1)
     state.camera.lookAt(lookTarget)
     signalShards.forEach((shard, index) => {
@@ -133,7 +133,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
 
 function World({ running, onProgress, onFall, collectedShards, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void }) {
   const cables = useMemo(() => Array.from({ length: 15 }, (_, i) => i), [])
-  return <Canvas shadows camera={{ fov: 45, position: [9, 7, 14] }} dpr={[1, 1.75]}>
+  return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
     <fog attach="fog" args={['#d5cdbd', 18, 66]} />
     <ambientLight intensity={1.55} color="#fff3d7" />
@@ -168,6 +168,7 @@ function App() {
     {!running && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Miss once, learn fast, go again. Collect the red signal shards to complete the route.</p><button onClick={() => setRunning(true)}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={() => setRunning(false)}>PAUSE</button>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
+    {running && <div className="camera-hint">C / RECENTER VIEW</div>}
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
 }
