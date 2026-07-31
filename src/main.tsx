@@ -114,6 +114,8 @@ const upperSideRoutePlatforms: Platform[] = Array.from({ length: 12 }, (_, index
 const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms, ...sideRoutePlatforms, ...upperSideRoutePlatforms].sort((a, b) => a.y - b.y)
 const courseHeight = platforms[platforms.length - 1].y + 1.2
 const platformXAt = (platform: Platform, time: number) => platform.x + (platform.sway ? Math.sin(time * 1.15 + platform.y * .23) * platform.sway : 0)
+const routeZAtHeight = (height: number) => height <= 23.9 ? -10.8 : -12.1 - ((height - 23.9) / 2.75) * 1.72
+const summitZ = routeZAtHeight(courseHeight)
 
 const signalShardAnchors = [starterPlatforms[1], extendedPlatforms[12], extendedPlatforms[30], extendedPlatforms[49], extendedPlatforms[64]]
 const signalShards: SignalShard[] = signalShardAnchors.map((platform) => ({ x: platform.x, y: platform.y + .58, z: platform.z }))
@@ -121,7 +123,7 @@ const signalShards: SignalShard[] = signalShardAnchors.map((platform) => ({ x: p
 const signalGates: SignalGate[] = Array.from({ length: 8 }, (_, index) => ({
   x: Math.sin(index * 1.8) * 1.4,
   y: 18 + index * 27.8,
-  z: -13 - index * 29,
+  z: routeZAtHeight(18 + index * 27.8),
   radius: 5.5 + index * .16,
 }))
 
@@ -135,7 +137,7 @@ const signalArtifacts: SignalArtifact[] = Array.from({ length: 12 }, (_, index) 
 const signalHunters: SignalHunter[] = Array.from({ length: 9 }, (_, index) => ({
   x: Math.sin(index * 1.3) * 1.2,
   y: 31 + index * 23.4,
-  z: -18 - index * 24.3,
+  z: routeZAtHeight(31 + index * 23.4) - (index % 2 ? 1.4 : -1.4),
   orbit: 2.8 + (index % 4) * .45,
   phase: index * 1.9,
 }))
@@ -143,7 +145,7 @@ const signalHunters: SignalHunter[] = Array.from({ length: 9 }, (_, index) => ({
 const signalGusts: SignalGust[] = Array.from({ length: 8 }, (_, index) => ({
   x: index % 2 ? 1.5 : -1,
   y: 36 + index * 24.2,
-  z: -24 - index * 25.5,
+  z: routeZAtHeight(36 + index * 24.2),
   direction: index % 2 ? -1 : 1,
   strength: 3.8 + index * .22,
 }))
@@ -433,7 +435,7 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
       {[-1, 1].map(side => <group key={side} position={[side * 6.8, 0, 0]}><mesh><cylinderGeometry args={[.55, .72, 15, 10]} /><meshStandardMaterial color="#d7e5e6" roughness={.8} /></mesh><mesh position={[0, 3.8, .05]}><boxGeometry args={[2.4, 1.2, .12]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.6} transparent opacity={.8} /></mesh></group>)}
       <mesh position={[0, 6.5, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[6.8, .16, 12, 48]} /><meshStandardMaterial color="#d6f6f1" emissive="#8bd9cf" emissiveIntensity={.9} transparent opacity={.7} /></mesh>
     </group>
-    <Float speed={.8} rotationIntensity={.08} floatIntensity={.18}><group position={[0, courseHeight - 2.2, -142]}>
+    <Float speed={.8} rotationIntensity={.08} floatIntensity={.18}><group position={[0, courseHeight - 2.2, summitZ]}>
       <mesh><torusGeometry args={[7.5, .24, 14, 64]} /><meshStandardMaterial color="#ff6a47" emissive="#c83c2b" emissiveIntensity={1.8} metalness={.6} roughness={.2} /></mesh>
       <mesh rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[5.8, .08, 10, 48]} /><meshStandardMaterial color="#f7d27e" emissive="#d9a43d" emissiveIntensity={1.5} /></mesh>
     </group></Float>
@@ -479,7 +481,7 @@ function SummitBeacon({ active }: { active: boolean }) {
   const ring = useRef<THREE.Group>(null)
   useFrame((state) => { if (!ring.current || !active) return; ring.current.rotation.y = state.clock.elapsedTime * .7; ring.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.8) * .12 })
   if (!active) return null
-  return <group position={[0, courseHeight + 1.6, -142]}>
+  return <group position={[0, courseHeight + 1.6, summitZ]}>
     <pointLight color="#ffb56b" intensity={9} distance={26} decay={2} />
     <mesh position={[0, 3.5, 0]}><cylinderGeometry args={[.04, .3, 7, 8]} /><meshStandardMaterial color="#ff8b5c" emissive="#d94a31" emissiveIntensity={2.2} transparent opacity={.68} /></mesh>
     <group ref={ring}>
@@ -499,7 +501,7 @@ function SignalWarden({ mode, active }: { mode: RunMode; active: boolean }) {
     warden.current.position.y = courseHeight + 3.8 + Math.sin(state.clock.elapsedTime * .7) * .28
   })
   if (!active) return null
-  return <group ref={warden} position={[0, courseHeight + 3.8, -142]}>
+  return <group ref={warden} position={[0, courseHeight + 3.8, summitZ]}>
     <pointLight color={color} intensity={4.5} distance={18} decay={2} />
     <mesh castShadow><icosahedronGeometry args={[1.15, 1]} /><meshStandardMaterial color="#1c252c" emissive={color} emissiveIntensity={1.2} metalness={.86} roughness={.2} /></mesh>
     <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.85, .08, 10, 48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.1} transparent opacity={.8} depthWrite={false} /></mesh>
@@ -831,7 +833,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <EchoRunner path={ghostPath} active={running} runId={runId} />
     <Player running={running} runId={runId} mode={mode} mutator={mutator} modifiers={modifiers} heat={heat} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onArtifact={onArtifact} onGate={onGate} onGhostFrame={onGhostFrame} onLand={onLand} onMantle={onMantle} onBurst={onBurst} onGrapple={onGrapple} onCheckpoint={onCheckpoint} onViewChange={onViewChange} onHunterHit={onHunterHit} onPhase={onPhase} onComplete={onComplete} />
-    <Html position={[0, courseHeight + 1.2, -142]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
+    <Html position={[0, courseHeight + 1.2, summitZ]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
 
