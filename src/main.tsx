@@ -505,6 +505,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
   const yaw = useRef(.28)
   const pitch = useRef(.12)
   const viewMode = useRef<'third' | 'first'>('third')
+  const cameraDistance = useRef(15.5)
   const dragging = useRef(false)
   const previousPointer = useRef({ x: 0, y: 0 })
   const completedRun = useRef(false)
@@ -544,8 +545,9 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
       yaw.current -= dx * .0026
       pitch.current = THREE.MathUtils.clamp(pitch.current - dy * .0022, -.5, .72)
     }
-    addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clearKeys); addEventListener('visibilitychange', clearKeys); addEventListener('pointerdown', touchDown); addEventListener('pointerup', touchUp); addEventListener('pointercancel', touchUp); canvas?.addEventListener('pointerdown', handlePointerDown); addEventListener('pointerup', handlePointerUp); addEventListener('mousemove', handleMouseMove)
-    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up); removeEventListener('blur', clearKeys); removeEventListener('visibilitychange', clearKeys); removeEventListener('pointerdown', touchDown); removeEventListener('pointerup', touchUp); removeEventListener('pointercancel', touchUp); canvas?.removeEventListener('pointerdown', handlePointerDown); removeEventListener('pointerup', handlePointerUp); removeEventListener('mousemove', handleMouseMove) }
+    const handleWheel = (event: WheelEvent) => { if (viewMode.current === 'first') return; cameraDistance.current = THREE.MathUtils.clamp(cameraDistance.current + event.deltaY * .012, 7.5, 24); event.preventDefault() }
+    addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clearKeys); addEventListener('visibilitychange', clearKeys); addEventListener('pointerdown', touchDown); addEventListener('pointerup', touchUp); addEventListener('pointercancel', touchUp); canvas?.addEventListener('pointerdown', handlePointerDown); addEventListener('pointerup', handlePointerUp); addEventListener('mousemove', handleMouseMove); canvas?.addEventListener('wheel', handleWheel, { passive: false })
+    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up); removeEventListener('blur', clearKeys); removeEventListener('visibilitychange', clearKeys); removeEventListener('pointerdown', touchDown); removeEventListener('pointerup', touchUp); removeEventListener('pointercancel', touchUp); canvas?.removeEventListener('pointerdown', handlePointerDown); removeEventListener('pointerup', handlePointerUp); removeEventListener('mousemove', handleMouseMove); canvas?.removeEventListener('wheel', handleWheel) }
   }, [onViewChange])
 
   useEffect(() => {
@@ -556,6 +558,7 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     claimedGates.current = new Set()
     claimedArtifacts.current = new Set()
     viewMode.current = 'third'
+    cameraDistance.current = 15.5
     runClock.current = 0
     nextGhostSample.current = 0
   }, [runId])
@@ -714,8 +717,8 @@ function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, on
     } else {
       body.current.visible = true
       const lookTarget = new THREE.Vector3(position.current.x * .25, Math.max(1.4, position.current.y + 1.45), position.current.z - 2.6)
-      const cameraDistance = 15.5
-      const cameraOffset = new THREE.Vector3(Math.sin(yaw.current) * cameraDistance, 5.1 + Math.sin(pitch.current) * 5.5, Math.cos(yaw.current) * cameraDistance)
+      const chaseDistance = cameraDistance.current
+      const cameraOffset = new THREE.Vector3(Math.sin(yaw.current) * chaseDistance, 5.1 + Math.sin(pitch.current) * 5.5, Math.cos(yaw.current) * chaseDistance)
       state.camera.position.lerp(lookTarget.clone().add(cameraOffset), .1)
       state.camera.lookAt(lookTarget)
     }
@@ -936,7 +939,7 @@ function App() {
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><button className="reroll-card" onClick={rerollCards} disabled={cardRerolls <= 0}>REROLL HAND · {cardRerolls ? '1 LEFT' : 'SPENT'}</button><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST · REROLL BURNS THE HAND</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
-    {running && <div className="camera-hint">C / RECENTER · V / {cameraMode === 'third' ? 'FIRST PERSON' : 'CHASE CAM'}</div>}
+    {running && <div className="camera-hint">C / RECENTER · V / {cameraMode === 'third' ? 'FIRST PERSON' : 'CHASE CAM'} · WHEEL / ZOOM</div>}
     <button className="sound-toggle" onClick={toggleSound} aria-label={soundOn ? 'Mute signal audio' : 'Enable signal audio'}>{soundOn ? 'AUDIO ON' : 'AUDIO OFF'}</button>
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
