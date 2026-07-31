@@ -307,6 +307,24 @@ function CitySpire({ position, height, color, accent, phase }: { position: [numb
   </group>
 }
 
+function DistrictGateway({ position, color, label, phase }: { position: [number, number, number]; color: string; label: string; phase: number }) {
+  const pulse = useRef<THREE.Group>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  useFrame((state) => {
+    if (!pulse.current) return
+    pulse.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 1.5 + phase) * .025)
+    pulse.current.rotation.y = Math.sin(state.clock.elapsedTime * .35 + phase) * .035
+  })
+  return <group ref={pulse} position={position}>
+    <mesh castShadow position={[-7.1, 0, 0]}><boxGeometry args={[.48, 14, .48]} /><meshStandardMaterial color="#202631" metalness={.82} roughness={.28} /></mesh>
+    <mesh castShadow position={[7.1, 0, 0]}><boxGeometry args={[.48, 14, .48]} /><meshStandardMaterial color="#202631" metalness={.82} roughness={.28} /></mesh>
+    <mesh castShadow position={[0, 6.8, 0]}><boxGeometry args={[14.7, .5, .52]} /><meshStandardMaterial color="#202631" metalness={.82} roughness={.28} /></mesh>
+    <mesh ref={ring} position={[0, 5.8, 0]}><torusGeometry args={[5.6, .12, 10, 48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.9} transparent opacity={.75} depthWrite={false} /></mesh>
+    <mesh position={[0, 6.8, .3]}><boxGeometry args={[6.4, .08, .05]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.2} /></mesh>
+    <Html transform position={[0, 7.5, .32]} distanceFactor={13}><div className="world-billboard gateway-label" style={{ color }}>{label}</div></Html>
+  </group>
+}
+
 function SignalGrid({ mode }: { mode: RunMode }) {
   const material = useRef<THREE.ShaderMaterial>(null)
   const color = mode === 'stormline' ? new THREE.Color('#ff5966') : mode === 'zenith' ? new THREE.Color('#8ddfff') : new THREE.Color('#dfb65f')
@@ -392,6 +410,9 @@ function WorldBackdrop({ mode, mutator }: { mode: RunMode; mutator: DailyMutator
       <mesh position={[0, -2.1, 0]}><cylinderGeometry args={[.09, .09, 4.2, 8]} /><meshStandardMaterial color="#202631" metalness={.8} roughness={.3} /></mesh>
     </group>)}
     {spires.map((spire, index) => <CitySpire key={`spire-${index}`} position={[spire.x, spire.y, spire.z]} height={spire.height} color={index % 3 === 0 ? skylineColor : '#27323a'} accent={index % 2 ? '#58e4dc' : '#ff6b4b'} phase={index} />)}
+    <DistrictGateway position={[0, 58, -36]} color={stormline ? '#ff5966' : '#d7ad47'} label="NEON UNDERPASS" phase={.4} />
+    <DistrictGateway position={[0, 126, -78]} color={zenith ? '#8ddfff' : '#c77dff'} label="CLOUD CATHEDRAL" phase={1.8} />
+    <DistrictGateway position={[0, 188, -121]} color={stormline ? '#ff5966' : '#ff794d'} label="SIGNAL CORE" phase={3.2} />
     {[-1, 1].map((side) => <mesh key={side} position={[side * 31, 7, -62]} rotation={[0, 0, side * .22]}><coneGeometry args={[18, 34, 5]} /><meshStandardMaterial color="#35443f" roughness={1} /></mesh>)}
     {gates.map((gate, index) => <group key={`gate-${index}`} position={[gate.x, gate.y, gate.z]} rotation={[0, index * .12, 0]}>
       <mesh><torusGeometry args={[5.5 + index * .35, .12, 12, 48]} /><meshStandardMaterial color={gate.color} emissive={gate.color} emissiveIntensity={.65} metalness={.55} roughness={.28} /></mesh>
