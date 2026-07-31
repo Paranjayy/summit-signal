@@ -489,6 +489,25 @@ function SummitBeacon({ active }: { active: boolean }) {
   </group>
 }
 
+function SignalWarden({ mode, active }: { mode: RunMode; active: boolean }) {
+  const warden = useRef<THREE.Group>(null)
+  const color = mode === 'stormline' ? '#ff5966' : mode === 'zenith' ? '#8ddfff' : '#f0b85f'
+  useFrame((state) => {
+    if (!warden.current || !active) return
+    warden.current.rotation.y = state.clock.elapsedTime * .42
+    warden.current.rotation.z = Math.sin(state.clock.elapsedTime * .8) * .08
+    warden.current.position.y = courseHeight + 3.8 + Math.sin(state.clock.elapsedTime * .7) * .28
+  })
+  if (!active) return null
+  return <group ref={warden} position={[0, courseHeight + 3.8, -142]}>
+    <pointLight color={color} intensity={4.5} distance={18} decay={2} />
+    <mesh castShadow><icosahedronGeometry args={[1.15, 1]} /><meshStandardMaterial color="#1c252c" emissive={color} emissiveIntensity={1.2} metalness={.86} roughness={.2} /></mesh>
+    <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.85, .08, 10, 48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.1} transparent opacity={.8} depthWrite={false} /></mesh>
+    <mesh rotation={[0, Math.PI / 2, 0]}><torusGeometry args={[2.45, .035, 8, 48]} /><meshStandardMaterial color="#f8ecda" emissive="#fff0bf" emissiveIntensity={1.1} transparent opacity={.52} depthWrite={false} /></mesh>
+    <mesh position={[0, -3.8, 0]}><cylinderGeometry args={[.018, .08, 7.6, 8]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.8} transparent opacity={.3} depthWrite={false} /></mesh>
+  </group>
+}
+
 function Player({ running, runId, mode, mutator, modifiers, heat, onProgress, onFall, onCollect, onArtifact, onGate, onGhostFrame, onLand, onMantle, onBurst, onGrapple, onCheckpoint, onViewChange, onHunterHit, onPhase, onComplete }: { running: boolean; runId: number; mode: RunMode; mutator: DailyMutator; modifiers: RunModifiers; heat: number; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onArtifact: (index: number) => void; onGate: (index: number, airborne: boolean) => void; onGhostFrame: (frame: GhostFrame) => void; onLand: (perfect: boolean, shortcut: boolean) => void; onMantle?: () => void; onBurst: () => void; onGrapple: () => void; onCheckpoint: (height: number) => void; onViewChange: (view: 'third' | 'first') => void; onHunterHit: () => void; onPhase: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const grappleBeam = useRef<THREE.Mesh>(null)
@@ -794,6 +813,7 @@ function World({ running, completed, mode, mutator, modifiers, biome, heat, ghos
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
     <StormFlash active={mode === 'stormline' || heat > 88} />
+    <SignalWarden mode={mode} active={running || completed} />
     <SummitBeacon active={completed} />
     {checkpointHeight > 0 && <CheckpointBeacon position={[platformXAt(checkpointPlatform, 0), checkpointPlatform.y + .34, checkpointPlatform.z]} mode={mode} />}
     <Environment preset="sunset" />
