@@ -8,6 +8,13 @@ import './styles.css'
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
 type SignalShard = { x: number; y: number; z: number }
 
+const formatTime = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
+  const remainder = Math.floor(seconds % 60).toString().padStart(2, '0')
+  const tenths = Math.floor((seconds % 1) * 10)
+  return `${minutes}:${remainder}.${tenths}`
+}
+
 const starterPlatforms: Platform[] = [
   { x: 0, y: 0, z: 0, width: 7, depth: 7, kind: 'scaffold' },
   { x: -2.8, y: 2.5, z: -1.3, width: 3.2, depth: 3, kind: 'container' },
@@ -59,7 +66,7 @@ function SignalShardMesh({ shard, collected }: { shard: SignalShard; collected: 
   </Float>
 }
 
-function Player({ running, onProgress, onFall, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void }) {
+function Player({ running, onProgress, onFall, onCollect, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
@@ -71,6 +78,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   const pitch = useRef(.12)
   const dragging = useRef(false)
   const previousPointer = useRef({ x: 0, y: 0 })
+  const completedRun = useRef(false)
   const reset = () => { position.current.set(0, .34, 0); velocity.current.set(0, 0, 0); grounded.current = true }
 
   useEffect(() => {
@@ -95,6 +103,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   useEffect(() => {
     reset()
     keys.current = {}
+    completedRun.current = false
   }, [running])
 
   useFrame((state, delta) => {
@@ -143,6 +152,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
         onCollect(index)
       }
     })
+    if (!completedRun.current && position.current.y >= courseHeight - 1.5) { completedRun.current = true; onComplete() }
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
   return <group ref={body} position={[0, .34, 0]} castShadow>
@@ -152,7 +162,7 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
   </group>
 }
 
-function World({ running, onProgress, onFall, collectedShards, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void }) {
+function World({ running, onProgress, onFall, collectedShards, onCollect, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
@@ -168,7 +178,7 @@ function World({ running, onProgress, onFall, collectedShards, onCollect }: { ru
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} />
+    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -179,15 +189,39 @@ function App() {
   const [falls, setFalls] = useState(0)
   const [collectedShards, setCollectedShards] = useState<Set<number>>(new Set())
   const [best, setBest] = useState(() => Number(localStorage.getItem('summit-signal-best') || 0))
+  const [started, setStarted] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const [startedAt, setStartedAt] = useState(0)
+  const [completed, setCompleted] = useState(false)
+  const [finalTime, setFinalTime] = useState(0)
+  const [speedrunBest, setSpeedrunBest] = useState(() => Number(localStorage.getItem('summit-signal-speedrun-best') || 0))
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
+  useEffect(() => {
+    if (!running || completed || !startedAt) return
+    const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
+    return () => window.clearInterval(timer)
+  }, [running, completed, startedAt])
+  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setFalls(0); setCollectedShards(new Set()); setRunning(true) }
+  const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
+  const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
+  const completeRun = () => {
+    const time = elapsed
+    setFinalTime(time)
+    setCompleted(true)
+    setRunning(false)
+    if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
+  }
   return <main>
-    <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} />
+    <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
+    <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!running && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Miss once, learn fast, go again. Collect the red signal shards to complete the route.</p><button onClick={() => setRunning(true)}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
-    {running && <button className="pause" onClick={() => setRunning(false)}>PAUSE</button>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
+    {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
+    {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
+    {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
     {running && <div className="camera-hint">C / RECENTER VIEW</div>}
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
