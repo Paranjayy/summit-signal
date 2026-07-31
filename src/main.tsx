@@ -559,6 +559,10 @@ function Player({ running, mode, mutator, modifiers, heat, onProgress, onFall, o
     if (phaseShell.current) { phaseShell.current.visible = phaseVisual.current > 0; phaseShell.current.rotation.y += dt * 3.2; phaseShell.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 16) * .06) }
     if (landingRing.current) { landingRing.current.visible = landingPulse.current > 0; landingRing.current.scale.setScalar(1 + (1 - landingPulse.current) * 2.4); const material = landingRing.current.material as THREE.MeshStandardMaterial; material.opacity = landingPulse.current * .9 }
     const speed = Math.hypot(velocity.current.x, velocity.current.z)
+    const targetFov = THREE.MathUtils.clamp(56 + speed * .78 + (heat > 70 ? 2 : 0), 56, 68)
+    const camera = state.camera as THREE.PerspectiveCamera
+    camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 7, dt)
+    camera.updateProjectionMatrix()
     const trailOpacity = THREE.MathUtils.clamp((speed - 3.8) / 5.5, 0, 1) * .48
     ;[trailA.current, trailB.current].forEach((trail, index) => { if (trail) { trail.visible = trailOpacity > 0; trail.position.set((index ? -.18 : .18), .62 + index * .16, .42 + index * .14); trail.scale.set(1, 1, 1 + speed * .12); (trail.material as THREE.MeshStandardMaterial).opacity = trailOpacity } })
     if (grappleBeam.current) {
