@@ -225,6 +225,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
   const grappleLatch = useRef(false)
   const runClock = useRef(0)
   const nextGhostSample = useRef(0)
+  const cameraShake = useRef(0)
   const checkpoint = useRef(new THREE.Vector3(0, .34, 0))
   const reset = (toCheckpoint = false) => { position.current.copy(toCheckpoint ? checkpoint.current : new THREE.Vector3(0, .34, 0)); velocity.current.set(0, 0, 0); grounded.current = true; burstCooldown.current = 0; burstLatch.current = false; grappleCooldown.current = 0; grappleLatch.current = false; jumpLatch.current = false; coyoteTimer.current = .12; jumpBufferTimer.current = 0 }
 
@@ -288,6 +289,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
       grounded.current = false
       burstCooldown.current = 2.6 * modifiers.burstCooldownMultiplier
       burstLatch.current = true
+      cameraShake.current = Math.max(cameraShake.current, .11)
       onBurst()
     }
     if (wantsGrapple && !grappleLatch.current && grappleCooldown.current <= 0) {
@@ -299,6 +301,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
         grounded.current = false
         grappleCooldown.current = 5
         grappleLatch.current = true
+        cameraShake.current = Math.max(cameraShake.current, .1)
         onGrapple()
       }
     }
@@ -324,7 +327,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
         const withinZ = Math.abs(position.current.z - p.z) < p.depth / 2 + .55
         const onTop = crossedTop || nearLedge
         if (onTop && withinX && withinZ) {
-          position.current.y = p.y + .34; position.current.x = platformX; velocity.current.y = 0; grounded.current = true; onLand()
+          position.current.y = p.y + .34; position.current.x = platformX; velocity.current.y = 0; grounded.current = true; cameraShake.current = Math.max(cameraShake.current, .14); onLand()
           if (p.y > checkpoint.current.y + 7) { checkpoint.current.set(platformX, p.y + .34, p.z); onCheckpoint(p.y) }
           break
         }
@@ -332,6 +335,7 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
     }
     if (position.current.y < -5) { const forgiven = onFall(); reset(true); if (forgiven) setTimeout(() => onProgress(Math.max(0, checkpoint.current.y)), 0) }
     body.current.position.copy(position.current)
+    cameraShake.current = Math.max(0, cameraShake.current - dt * 1.5)
     if (runClock.current >= nextGhostSample.current) { onGhostFrame({ t: runClock.current, x: position.current.x, y: position.current.y, z: position.current.z }); nextGhostSample.current = runClock.current + .08 }
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
     if (Math.abs(velocity.current.x) + Math.abs(velocity.current.z) > .08) body.current.rotation.y = THREE.MathUtils.damp(body.current.rotation.y, Math.atan2(velocity.current.x, -velocity.current.z), 10, dt)
@@ -351,21 +355,25 @@ function Player({ running, mode, modifiers, heat, onProgress, onFall, onCollect,
       state.camera.position.lerp(lookTarget.clone().add(cameraOffset), .1)
       state.camera.lookAt(lookTarget)
     }
+    if (cameraShake.current > 0) { const shakePhase = state.clock.elapsedTime * 64; state.camera.position.x += Math.sin(shakePhase) * cameraShake.current; state.camera.position.y += Math.cos(shakePhase * .83) * cameraShake.current * .7 }
     signalShards.forEach((shard, index) => {
       if (!claimedShards.current.has(index) && position.current.distanceTo(new THREE.Vector3(shard.x, shard.y, shard.z)) < modifiers.pickupRadius) {
         claimedShards.current.add(index)
+        cameraShake.current = Math.max(cameraShake.current, .06)
         onCollect(index)
       }
     })
     signalGates.forEach((gate, index) => {
       if (!claimedGates.current.has(index) && Math.abs(position.current.y - gate.y) < 2.8 && Math.hypot(position.current.x - gate.x, position.current.z - gate.z) < gate.radius) {
         claimedGates.current.add(index)
+        cameraShake.current = Math.max(cameraShake.current, .16)
         onGate(index)
       }
     })
     signalArtifacts.forEach((artifact, index) => {
       if (!claimedArtifacts.current.has(index) && position.current.distanceTo(new THREE.Vector3(artifact.x, artifact.y, artifact.z)) < 1.15) {
         claimedArtifacts.current.add(index)
+        cameraShake.current = Math.max(cameraShake.current, .08)
         onArtifact(index)
       }
     })
