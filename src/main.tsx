@@ -16,6 +16,37 @@ const formatTime = (seconds: number) => {
   return `${minutes}:${remainder}.${tenths}`
 }
 
+type AudioCue = 'land' | 'shard' | 'gate' | 'burst' | 'checkpoint' | 'fail' | 'finish'
+
+const cuePattern: Record<AudioCue, { notes: number[]; duration: number; type: OscillatorType; volume: number }> = {
+  land: { notes: [164], duration: .08, type: 'triangle', volume: .028 },
+  shard: { notes: [392, 587], duration: .11, type: 'sine', volume: .035 },
+  gate: { notes: [261, 392, 659], duration: .13, type: 'square', volume: .028 },
+  burst: { notes: [220, 330], duration: .09, type: 'sawtooth', volume: .024 },
+  checkpoint: { notes: [196, 294, 440], duration: .16, type: 'triangle', volume: .032 },
+  fail: { notes: [130, 98], duration: .16, type: 'sine', volume: .032 },
+  finish: { notes: [262, 330, 392, 523], duration: .18, type: 'triangle', volume: .036 },
+}
+
+const playCue = (context: AudioContext | null, cue: AudioCue) => {
+  if (!context) return
+  const pattern = cuePattern[cue]
+  const now = context.currentTime
+  pattern.notes.forEach((frequency, index) => {
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    const start = now + index * pattern.duration * .72
+    oscillator.type = pattern.type
+    oscillator.frequency.setValueAtTime(frequency, start)
+    gain.gain.setValueAtTime(.0001, start)
+    gain.gain.exponentialRampToValueAtTime(pattern.volume, start + .012)
+    gain.gain.exponentialRampToValueAtTime(.0001, start + pattern.duration)
+    oscillator.connect(gain).connect(context.destination)
+    oscillator.start(start)
+    oscillator.stop(start + pattern.duration + .02)
+  })
+}
+
 const starterPlatforms: Platform[] = [
   { x: 0, y: 0, z: 0, width: 7, depth: 7, kind: 'scaffold' },
   { x: -2.8, y: 2.5, z: -1.3, width: 3.2, depth: 3, kind: 'container' },
@@ -253,6 +284,7 @@ function World({ running, mode, modifiers, biome, onProgress, onFall, collectedS
 const drawCards = (seed: number) => CARD_POOL.map((_, index) => CARD_POOL[(seed + index * 2) % CARD_POOL.length])
 
 function App() {
+  const audio = useRef<AudioContext | null>(null)
   const [running, setRunning] = useState(false)
   const [height, setHeight] = useState(0)
   const [falls, setFalls] = useState(0)
@@ -284,7 +316,7 @@ function App() {
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
+  const startRun = () => { if (!audio.current) audio.current = new AudioContext(); void audio.current.resume(); setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -292,6 +324,7 @@ function App() {
     setFinalTime(time)
     setCompleted(true)
     setRunning(false)
+    playCue(audio.current, 'finish')
     if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
   const chooseCard = (card: SignalCard) => { setActiveCards(current => [...current, card]); setModifiers(current => mergeModifiers(current, card)); setPendingCards([]); setRunning(true); setSignalFlash(`${card.title} ONLINE · KEEP CLIMBING`) }
@@ -302,13 +335,13 @@ function App() {
     return () => removeEventListener('keydown', chooseWithKey)
   }, [pendingCards])
   const handleFall = () => {
-    if (modifiers.anchorCharges > 0) { setModifiers(current => ({ ...current, anchorCharges: current.anchorCharges - 1 })); setSignalFlash('ANCHOR SPENT · FALL FORGIVEN'); return true }
-    setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); return false
+    if (modifiers.anchorCharges > 0) { setModifiers(current => ({ ...current, anchorCharges: current.anchorCharges - 1 })); setSignalFlash('ANCHOR SPENT · FALL FORGIVEN'); playCue(audio.current, 'checkpoint'); return true }
+    setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); playCue(audio.current, 'fail'); return false
   }
-  const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false) }
-  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`) }
+  const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false); playCue(audio.current, 'checkpoint') }
+  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`); playCue(audio.current, 'gate') }
   return <main>
-    <World running={running} mode={mode} modifiers={modifiers} biome={biome} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onGate={handleGate} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
+    <World running={running} mode={mode} modifiers={modifiers} biome={biome} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`); playCue(audio.current, 'shard') }} onGate={handleGate} onLand={() => { playCue(audio.current, 'land'); setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next }) }} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); playCue(audio.current, 'burst'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
