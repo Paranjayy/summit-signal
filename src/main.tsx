@@ -84,7 +84,7 @@ function WorldBackdrop() {
   </group>
 }
 
-function Player({ running, onProgress, onFall, onCollect, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onComplete: () => void }) {
+function Player({ running, onProgress, onFall, onCollect, onLand, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onLand: () => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
@@ -152,7 +152,7 @@ function Player({ running, onProgress, onFall, onCollect, onComplete }: { runnin
         const withinX = Math.abs(position.current.x - p.x) < p.width / 2 + .55
         const withinZ = Math.abs(position.current.z - p.z) < p.depth / 2 + .55
         const onTop = crossedTop || nearLedge
-        if (onTop && withinX && withinZ) { position.current.y = p.y + .34; velocity.current.y = 0; grounded.current = true; break }
+        if (onTop && withinX && withinZ) { position.current.y = p.y + .34; velocity.current.y = 0; grounded.current = true; onLand(); break }
       }
     }
     if (position.current.y < -5) { onFall(); reset() }
@@ -182,7 +182,7 @@ function Player({ running, onProgress, onFall, onCollect, onComplete }: { runnin
   </group>
 }
 
-function World({ running, onProgress, onFall, collectedShards, onCollect, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onComplete: () => void }) {
+function World({ running, onProgress, onFall, collectedShards, onCollect, onLand, onComplete }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
@@ -199,7 +199,7 @@ function World({ running, onProgress, onFall, collectedShards, onCollect, onComp
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onComplete={onComplete} />
+    <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -216,6 +216,9 @@ function App() {
   const [completed, setCompleted] = useState(false)
   const [finalTime, setFinalTime] = useState(0)
   const [speedrunBest, setSpeedrunBest] = useState(() => Number(localStorage.getItem('summit-signal-speedrun-best') || 0))
+  const [combo, setCombo] = useState(0)
+  const [comboBest, setComboBest] = useState(() => Number(localStorage.getItem('summit-signal-combo-best') || 0))
+  const [signalFlash, setSignalFlash] = useState('')
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   useEffect(() => {
@@ -223,7 +226,7 @@ function App() {
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setFalls(0); setCollectedShards(new Set()); setRunning(true) }
+  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setFalls(0); setCombo(0); setSignalFlash(''); setCollectedShards(new Set()); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -234,16 +237,18 @@ function App() {
     if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
   return <main>
-    <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} onComplete={completeRun} />
+    <World running={running} onProgress={onProgress} onFall={() => { setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · FIND YOUR LINE') }} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
+    {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · MOUSE LOOK</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
+    {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
     {running && <div className="camera-hint">C / RECENTER VIEW</div>}
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
   </main>
