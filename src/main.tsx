@@ -8,6 +8,7 @@ import { biomeLabels, CARD_POOL, DEFAULT_MODIFIERS, getBiome, getModeLabel, merg
 
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
 type SignalShard = { x: number; y: number; z: number }
+type SignalGate = { x: number; y: number; z: number; radius: number }
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
   const remainder = Math.floor(seconds % 60).toString().padStart(2, '0')
@@ -44,6 +45,13 @@ const signalShards: SignalShard[] = [
   { x: 0.6, y: 11.2, z: -5.6 },
   { x: -0.9, y: 16.9, z: -8.1 },
   { x: 0, y: 22.6, z: -10.8 },
+]
+
+const signalGates: SignalGate[] = [
+  { x: 0, y: 18, z: -13, radius: 5.5 },
+  { x: 0, y: 41, z: -38, radius: 5.8 },
+  { x: 0, y: 64, z: -63, radius: 6.1 },
+  { x: 0, y: 87, z: -88, radius: 6.4 },
 ]
 
 function PlatformMesh({ platform }: { platform: Platform }) {
@@ -88,13 +96,14 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
   </group>
 }
 
-function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onGate, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onGate: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
   const keys = useRef<Record<string, boolean>>({})
   const nextReport = useRef(0)
   const claimedShards = useRef(new Set<number>())
+  const claimedGates = useRef(new Set<number>())
   const grounded = useRef(true)
   const yaw = useRef(.28)
   const pitch = useRef(.12)
@@ -130,6 +139,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onLan
     reset()
     keys.current = {}
     completedRun.current = false
+    claimedGates.current = new Set()
   }, [running])
 
   useFrame((state, delta) => {
@@ -199,6 +209,12 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onLan
         onCollect(index)
       }
     })
+    signalGates.forEach((gate, index) => {
+      if (!claimedGates.current.has(index) && Math.abs(position.current.y - gate.y) < 2.8 && Math.hypot(position.current.x - gate.x, position.current.z - gate.z) < gate.radius) {
+        claimedGates.current.add(index)
+        onGate(index)
+      }
+    })
     if (!completedRun.current && position.current.y >= courseHeight - 1.5) { completedRun.current = true; onComplete() }
     if (state.clock.elapsedTime > nextReport.current) { onProgress(Math.max(0, position.current.y)); nextReport.current = state.clock.elapsedTime + .12 }
   })
@@ -209,7 +225,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onLan
   </group>
 }
 
-function World({ running, mode, modifiers, biome, onProgress, onFall, collectedShards, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function World({ running, mode, modifiers, biome, onProgress, onFall, collectedShards, onCollect, onGate, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; onCollect: (index: number) => void; onGate: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   const biomePalette = biome === 'neon-underpass' ? { sky: '#9b9bb6', fog: '#545775', ambient: '#d6d8f2', ground: '#313743' } : biome === 'cloud-cathedral' ? { sky: '#c9d8df', fog: '#a4b9c1', ambient: '#eff7ff', ground: '#61727a' } : biome === 'signal-core' ? { sky: '#e4c9b5', fog: '#b98172', ambient: '#ffe6c7', ground: '#3a2928' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
   const contractTint = mode === 'stormline' ? { sky: '#879a9a', fog: '#667b7b', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : biomePalette
@@ -229,7 +245,7 @@ function World({ running, mode, modifiers, biome, onProgress, onFall, collectedS
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} mode={mode} modifiers={modifiers} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
+    <Player running={running} mode={mode} modifiers={modifiers} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onGate={onGate} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
@@ -258,6 +274,7 @@ function App() {
   const [activeCards, setActiveCards] = useState<SignalCard[]>([])
   const [pendingCards, setPendingCards] = useState<SignalCard[]>([])
   const [cardSeed, setCardSeed] = useState(0)
+  const [gateHits, setGateHits] = useState<Set<number>>(new Set())
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const biome = getBiome(height, courseHeight)
   const modeLabel = getModeLabel(mode)
@@ -267,7 +284,7 @@ function App() {
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
+  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setGateHits(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setCardSeed(0); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -289,8 +306,9 @@ function App() {
     setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); return false
   }
   const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false) }
+  const handleGate = (index: number) => { setGateHits(current => new Set(current).add(index)); setCombo(current => current + 3); setStartedAt(current => current + 1800); setSignalFlash(`SIGNAL GATE ${index + 1}/4 · +3 STREAK · -1.8S`) }
   return <main>
-    <World running={running} mode={mode} modifiers={modifiers} biome={biome} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
+    <World running={running} mode={mode} modifiers={modifiers} biome={biome} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onGate={handleGate} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
@@ -298,6 +316,7 @@ function App() {
     {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
     {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
+    {running && <div className="gate-hunt">GATES <strong>{gateHits.size}/4</strong><small>RING THE SIGNAL</small></div>}
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
