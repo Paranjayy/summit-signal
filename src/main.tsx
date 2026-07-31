@@ -8,7 +8,7 @@ import './styles.css'
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
 type SignalShard = { x: number; y: number; z: number }
 
-const platforms: Platform[] = [
+const starterPlatforms: Platform[] = [
   { x: 0, y: 0, z: 0, width: 7, depth: 7, kind: 'scaffold' },
   { x: -2.8, y: 2.5, z: -1.3, width: 3.2, depth: 3, kind: 'container' },
   { x: 1.4, y: 4.9, z: -3.1, width: 3.4, depth: 2.6, kind: 'sign' },
@@ -19,6 +19,17 @@ const platforms: Platform[] = [
   { x: 3.2, y: 18.5, z: -9.4, width: 3.8, depth: 2.7, kind: 'scaffold' },
   { x: 0, y: 21.5, z: -10.8, width: 4.8, depth: 3.5, kind: 'cloud' },
 ]
+
+const extendedPlatforms: Platform[] = Array.from({ length: 30 }, (_, index) => {
+  const y = 23.9 + index * 2.55
+  const x = Math.sin(index * 1.47) * 4.2
+  const z = -12.1 - index * 1.45
+  const kinds: Platform['kind'][] = ['scaffold', 'container', 'sign', 'cloud']
+  return { x, y, z, width: 3.1 + (index % 3) * .45, depth: 2.7 + (index % 2) * .45, kind: kinds[index % kinds.length] }
+})
+
+const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms]
+const courseHeight = platforms[platforms.length - 1].y + 1.2
 
 const signalShards: SignalShard[] = [
   { x: -2.8, y: 3.75, z: -1.3 },
@@ -97,15 +108,21 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
     const targetZ = -Math.cos(yaw.current) * pace * 3.8 - Math.sin(yaw.current) * steer * 5.1
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
+    if (grounded.current) {
+      const supported = platforms.some((p) => Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - p.x) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12)
+      if (!supported) { grounded.current = false; velocity.current.y = -.6 }
+    }
     if (wantsJump && grounded.current) { velocity.current.y = 9.6; grounded.current = false }
     if (!grounded.current) velocity.current.y -= 13.8 * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
     if (!grounded.current && velocity.current.y < 0) {
       for (const p of platforms) {
-        const onTop = previousY >= p.y + .18 && position.current.y <= p.y + .34
-        const withinX = Math.abs(position.current.x - p.x) < p.width / 2 - .2
-        const withinZ = Math.abs(position.current.z - p.z) < p.depth / 2 - .2
+        const crossedTop = previousY >= p.y + .18 && position.current.y <= p.y + .34
+        const nearLedge = position.current.y <= p.y + .55 && position.current.y >= p.y - .75
+        const withinX = Math.abs(position.current.x - p.x) < p.width / 2 + .55
+        const withinZ = Math.abs(position.current.z - p.z) < p.depth / 2 + .55
+        const onTop = crossedTop || nearLedge
         if (onTop && withinX && withinZ) { position.current.y = p.y + .34; velocity.current.y = 0; grounded.current = true; break }
       }
     }
@@ -136,23 +153,23 @@ function Player({ running, onProgress, onFall, onCollect }: { running: boolean; 
 }
 
 function World({ running, onProgress, onFall, collectedShards, onCollect }: { running: boolean; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void }) {
-  const cables = useMemo(() => Array.from({ length: 15 }, (_, i) => i), [])
+  const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={['#d5cdbd']} />
-    <fog attach="fog" args={['#d5cdbd', 18, 66]} />
+    <fog attach="fog" args={['#d5cdbd', 34, 190]} />
     <ambientLight intensity={1.55} color="#fff3d7" />
     <directionalLight castShadow position={[8, 18, 10]} intensity={2.8} color="#ffe0a8" shadow-mapSize={[2048, 2048]} />
     <hemisphereLight args={['#f4c49a', '#36402f', 1.2]} />
     <Environment preset="sunset" />
     <Stars radius={75} depth={22} count={1000} factor={2} saturation={.15} fade speed={.2} />
     <Sparkles count={85} scale={[28, 30, 25]} size={2.5} speed={.22} color="#fff0bf" />
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -4]}><planeGeometry args={[110, 110]} /><meshStandardMaterial color="#546451" roughness={1} /></mesh>
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -.25, -45]}><planeGeometry args={[360, 360]} /><meshStandardMaterial color="#546451" roughness={1} /></mesh>
     {platforms.map((p, i) => <PlatformMesh platform={p} key={i} />)}
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
-    {cables.map((i) => <mesh key={i} position={[(i % 3 - 1) * 7, 8 + i * 1.7, -6 - i * .7]} rotation={[.15, 0, (i % 2 ? .2 : -.2)]}><cylinderGeometry args={[.025, .025, 15, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
+    {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
     <Player running={running} onProgress={onProgress} onFall={onFall} onCollect={onCollect} />
-    <Html position={[0, 25.5, -10.8]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
+    <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
 
@@ -162,7 +179,7 @@ function App() {
   const [falls, setFalls] = useState(0)
   const [collectedShards, setCollectedShards] = useState<Set<number>>(new Set())
   const [best, setBest] = useState(() => Number(localStorage.getItem('summit-signal-best') || 0))
-  const progress = Math.min(100, Math.round(height / 24.6 * 100))
+  const progress = Math.min(100, Math.round(height / courseHeight * 100))
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   return <main>
     <World running={running} onProgress={onProgress} onFall={() => setFalls(v => v + 1)} collectedShards={collectedShards} onCollect={(index) => setCollectedShards(current => new Set(current).add(index))} />
