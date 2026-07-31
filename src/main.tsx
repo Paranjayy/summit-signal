@@ -71,7 +71,18 @@ const extendedPlatforms: Platform[] = Array.from({ length: 30 }, (_, index) => {
   return { x, y, z, width: 3.1 + (index % 3) * .45, depth: 2.7 + (index % 2) * .45, kind, sway: kind === 'moving' ? (index % 2 ? 1.45 : -1.45) : undefined }
 })
 
-const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms]
+const sideRoutePlatforms: Platform[] = [
+  { x: -6.5, y: 27.4, z: -14.5, width: 2.5, depth: 2.2, kind: 'moving', sway: 1.1 },
+  { x: -7.2, y: 31.1, z: -18.4, width: 2.35, depth: 2.1, kind: 'scaffold' },
+  { x: 6.6, y: 34.8, z: -22.8, width: 2.55, depth: 2.2, kind: 'moving', sway: -1.4 },
+  { x: 7.1, y: 38.6, z: -27.2, width: 2.4, depth: 2.1, kind: 'sign' },
+  { x: -6.8, y: 45.5, z: -34.6, width: 2.55, depth: 2.2, kind: 'moving', sway: 1.5 },
+  { x: -7.4, y: 49.4, z: -39.2, width: 2.4, depth: 2.1, kind: 'scaffold' },
+  { x: 6.8, y: 56.2, z: -46.6, width: 2.55, depth: 2.2, kind: 'moving', sway: -1.35 },
+  { x: 7.2, y: 60.3, z: -51.1, width: 2.4, depth: 2.1, kind: 'sign' },
+]
+
+const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms, ...sideRoutePlatforms].sort((a, b) => a.y - b.y)
 const courseHeight = platforms[platforms.length - 1].y + 1.2
 const platformXAt = (platform: Platform, time: number) => platform.x + (platform.sway ? Math.sin(time * 1.15 + platform.y * .23) * platform.sway : 0)
 
@@ -163,7 +174,7 @@ function SignalArtifactMesh({ artifact, collected }: { artifact: SignalArtifact;
 
 function RouteRail({ mode }: { mode: RunMode }) {
   const rail = useMemo(() => {
-    const points = platforms.filter((platform, index) => index % 2 === 0 || index === platforms.length - 1).map((platform, index) => new THREE.Vector3(platform.x + (index % 2 ? 1.1 : -1.1), platform.y + 1.15, platform.z + .45))
+    const points = platforms.filter((platform, index) => Math.abs(platform.x) < 5.2 && (index % 2 === 0 || index === platforms.length - 1)).map((platform, index) => new THREE.Vector3(platform.x + (index % 2 ? 1.1 : -1.1), platform.y + 1.15, platform.z + .45))
     return new THREE.CatmullRomCurve3(points)
   }, [])
   const color = mode === 'stormline' ? '#ff5261' : mode === 'zenith' ? '#8ce7ff' : '#f0b85f'
@@ -643,7 +654,7 @@ function App() {
     {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
-    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · E GRAPPLE · SHIFT BURST · MOUSE LOOK · V VIEW</small></section>}
+    {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit. Side routes are faster, narrower, and hunted.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><div className="run-code">TODAY'S RUN <strong>{challengeCode}</strong></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SPACE JUMP · E GRAPPLE · SHIFT BURST · MOUSE LOOK · V VIEW</small></section>}
     {running && <button className="pause" onClick={pauseRun}>PAUSE</button>}
     {started && !running && !completed && pendingCards.length === 0 && <section className="pause-panel"><div className="eyebrow">RUN PAUSED · {modeLabel}</div><h2>HOLD<br /><i>THE LINE.</i></h2><p>Checkpoint anchor <strong>{Math.floor(checkpointHeight * 10)}M</strong><br />Run code <strong>{challengeCode}</strong></p><button onClick={resumeRun}>RESUME RUN <span>↗</span></button><small>R RESET RUN · C RECENTER · V CHANGE VIEW</small></section>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><div className="run-grade" aria-label={`Run grade ${runGrade}`}><span>RUN GRADE</span><strong>{runGrade}</strong></div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}<br /><small>GATES {gateHits.size}/4 · CACHE {artifactHits.size}/6</small></p><div className="finish-code">RUN CODE <strong>{challengeCode}</strong></div><button className="share-code" onClick={copyChallengeCode}>COPY RUN CODE</button><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
