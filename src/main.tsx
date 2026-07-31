@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import './styles.css'
 import { biomeLabels, CARD_POOL, DEFAULT_MODIFIERS, getBiome, getModeLabel, mergeModifiers, type BiomeId, type RunMode, type RunModifiers, type SignalCard } from './gameData'
 
-type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
+type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' | 'moving'; sway?: number }
 type SignalShard = { x: number; y: number; z: number }
 type SignalGate = { x: number; y: number; z: number; radius: number }
 type SignalArtifact = { x: number; y: number; z: number; label: string }
@@ -65,12 +65,14 @@ const extendedPlatforms: Platform[] = Array.from({ length: 30 }, (_, index) => {
   const y = 23.9 + index * 2.55
   const x = Math.sin(index * 1.47) * 4.2
   const z = -12.1 - index * 1.45
-  const kinds: Platform['kind'][] = ['scaffold', 'container', 'sign', 'cloud']
-  return { x, y, z, width: 3.1 + (index % 3) * .45, depth: 2.7 + (index % 2) * .45, kind: kinds[index % kinds.length] }
+  const kinds: Platform['kind'][] = ['scaffold', 'container', 'sign', 'cloud', 'moving']
+  const kind = kinds[index % kinds.length]
+  return { x, y, z, width: 3.1 + (index % 3) * .45, depth: 2.7 + (index % 2) * .45, kind, sway: kind === 'moving' ? (index % 2 ? 1.45 : -1.45) : undefined }
 })
 
 const platforms: Platform[] = [...starterPlatforms, ...extendedPlatforms]
 const courseHeight = platforms[platforms.length - 1].y + 1.2
+const platformXAt = (platform: Platform, time: number) => platform.x + (platform.sway ? Math.sin(time * 1.15 + platform.y * .23) * platform.sway : 0)
 
 const signalShards: SignalShard[] = [
   { x: -2.8, y: 3.75, z: -1.3 },
@@ -97,13 +99,15 @@ const signalArtifacts: SignalArtifact[] = [
 ]
 
 function PlatformMesh({ platform }: { platform: Platform }) {
-  const color = platform.kind === 'container' ? '#b74727' : platform.kind === 'sign' ? '#d7ad47' : platform.kind === 'cloud' ? '#dfe6e3' : '#6b5f49'
-  return <group position={[platform.x, platform.y, platform.z]}>
+  const group = useRef<THREE.Group>(null)
+  useFrame((state) => { if (group.current && platform.sway) group.current.position.x = platform.x + Math.sin(state.clock.elapsedTime * 1.15 + platform.y * .23) * platform.sway })
+  const color = platform.kind === 'container' ? '#b74727' : platform.kind === 'sign' ? '#d7ad47' : platform.kind === 'cloud' ? '#dfe6e3' : platform.kind === 'moving' ? '#3e8f98' : '#6b5f49'
+  return <group ref={group} position={[platform.x, platform.y, platform.z]}>
     <mesh castShadow receiveShadow position={[0, -0.2, 0]}>
       <boxGeometry args={[platform.width, 0.4, platform.depth]} />
       <meshStandardMaterial color={color} roughness={platform.kind === 'cloud' ? 0.95 : 0.64} metalness={platform.kind === 'scaffold' ? 0.7 : 0.08} />
     </mesh>
-    {platform.kind === 'scaffold' && [-1, 1].flatMap((sx) => [-1, 1].map((sz) => <mesh key={`${sx}${sz}`} castShadow position={[sx * (platform.width / 2 - .18), -1.1, sz * (platform.depth / 2 - .18)]}><cylinderGeometry args={[.08, .08, 1.8, 8]} /><meshStandardMaterial color="#312c23" metalness={.85} roughness={.3} /></mesh>))}
+    {(platform.kind === 'scaffold' || platform.kind === 'moving') && [-1, 1].flatMap((sx) => [-1, 1].map((sz) => <mesh key={`${sx}${sz}`} castShadow position={[sx * (platform.width / 2 - .18), -1.1, sz * (platform.depth / 2 - .18)]}><cylinderGeometry args={[.08, .08, 1.8, 8]} /><meshStandardMaterial color={platform.kind === 'moving' ? '#224d54' : '#312c23'} metalness={.85} roughness={.3} /></mesh>))}
     {platform.kind === 'sign' && <mesh castShadow position={[0, .85, 0]} rotation={[0, .18, 0]}><boxGeometry args={[platform.width * .8, 1.3, .12]} /><meshStandardMaterial color="#f1c24d" emissive="#7b4b0b" emissiveIntensity={.35} /></mesh>}
     {platform.kind === 'cloud' && <><mesh position={[-.8, .25, 0]}><sphereGeometry args={[.85, 16, 12]} /><meshStandardMaterial color="#f6f4ea" roughness={1} /></mesh><mesh position={[.65, .2, .15]}><sphereGeometry args={[1.08, 16, 12]} /><meshStandardMaterial color="#f6f4ea" roughness={1} /></mesh></>}
   </group>
@@ -256,7 +260,7 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArt
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5) * windScale
     velocity.current.x += crosswind * dt
     if (grounded.current) {
-      const supported = platforms.some((p) => Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - p.x) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12)
+      const supported = platforms.some((p) => { const platformX = platformXAt(p, state.clock.elapsedTime); return Math.abs(position.current.y - (p.y + .34)) < .08 && Math.abs(position.current.x - platformX) < p.width / 2 + .12 && Math.abs(position.current.z - p.z) < p.depth / 2 + .12 })
       if (!supported) { grounded.current = false; velocity.current.y = -.6 }
     }
     if (wantsJump && grounded.current) { velocity.current.y = 9.6; grounded.current = false }
@@ -267,12 +271,13 @@ function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onArt
       for (const p of platforms) {
         const crossedTop = previousY >= p.y + .18 && position.current.y <= p.y + .34
         const nearLedge = position.current.y <= p.y + .55 && position.current.y >= p.y - .75
-        const withinX = Math.abs(position.current.x - p.x) < p.width / 2 + .55
+        const platformX = platformXAt(p, state.clock.elapsedTime)
+        const withinX = Math.abs(position.current.x - platformX) < p.width / 2 + .55
         const withinZ = Math.abs(position.current.z - p.z) < p.depth / 2 + .55
         const onTop = crossedTop || nearLedge
         if (onTop && withinX && withinZ) {
-          position.current.y = p.y + .34; velocity.current.y = 0; grounded.current = true; onLand()
-          if (p.y > checkpoint.current.y + 7) { checkpoint.current.set(p.x, p.y + .34, p.z); onCheckpoint(p.y) }
+          position.current.y = p.y + .34; position.current.x = platformX; velocity.current.y = 0; grounded.current = true; onLand()
+          if (p.y > checkpoint.current.y + 7) { checkpoint.current.set(platformX, p.y + .34, p.z); onCheckpoint(p.y) }
           break
         }
       }
