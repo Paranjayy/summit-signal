@@ -4,11 +4,10 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Environment, Float, Html, Sparkles, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import './styles.css'
+import { biomeLabels, CARD_POOL, DEFAULT_MODIFIERS, getBiome, getModeLabel, mergeModifiers, type BiomeId, type RunMode, type RunModifiers, type SignalCard } from './gameData'
 
 type Platform = { x: number; y: number; z: number; width: number; depth: number; kind: 'scaffold' | 'sign' | 'container' | 'cloud' }
 type SignalShard = { x: number; y: number; z: number }
-type RunMode = 'standard' | 'stormline' | 'zenith'
-
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
   const remainder = Math.floor(seconds % 60).toString().padStart(2, '0')
@@ -89,7 +88,7 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
   </group>
 }
 
-function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; onProgress: (height: number) => void; onFall: () => void; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function Player({ running, mode, modifiers, onProgress, onFall, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; onProgress: (height: number) => void; onFall: () => boolean; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const body = useRef<THREE.Group>(null)
   const velocity = useRef(new THREE.Vector3(0, 0, 0))
   const position = useRef(new THREE.Vector3(0, .34, 0))
@@ -141,8 +140,8 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
     const wantsJump = Boolean(keys.current[' '] || keys.current.space || keys.current.spacebar)
     const wantsBurst = Boolean(keys.current.shift || keys.current.shiftleft || keys.current.shiftright)
     // Movement follows the camera's horizontal heading, as expected in a third-person game.
-    const targetX = -Math.sin(yaw.current) * pace * 3.8 + Math.cos(yaw.current) * steer * 5.1
-    const targetZ = -Math.cos(yaw.current) * pace * 3.8 - Math.sin(yaw.current) * steer * 5.1
+    const targetX = -Math.sin(yaw.current) * pace * 3.8 * modifiers.speedMultiplier + Math.cos(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
+    const targetZ = -Math.cos(yaw.current) * pace * 3.8 * modifiers.speedMultiplier - Math.sin(yaw.current) * steer * (5.1 + modifiers.airControlBonus)
     velocity.current.x = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.x, targetX, 10, dt)
     velocity.current.z = pace === 0 && steer === 0 ? 0 : THREE.MathUtils.damp(velocity.current.z, targetZ, 10, dt)
     burstCooldown.current = Math.max(0, burstCooldown.current - dt)
@@ -152,13 +151,13 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
       if (burstDirection.lengthSq() < .01) burstDirection.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
       burstDirection.normalize()
       velocity.current.addScaledVector(burstDirection, 8.2)
-      velocity.current.y = Math.max(velocity.current.y, 3.1)
+      velocity.current.y = Math.max(velocity.current.y, 3.1 * modifiers.burstLiftMultiplier)
       grounded.current = false
-      burstCooldown.current = 2.6
+      burstCooldown.current = 2.6 * modifiers.burstCooldownMultiplier
       burstLatch.current = true
       onBurst()
     }
-    const windScale = mode === 'stormline' ? 1.65 : mode === 'zenith' ? 1.15 : 1
+    const windScale = (mode === 'stormline' ? 1.65 : mode === 'zenith' ? 1.15 : 1) * modifiers.windMultiplier
     const crosswind = Math.sin(state.clock.elapsedTime * 1.4 + position.current.y * .16) * (.08 + Math.min(1, position.current.y / courseHeight) * .5) * windScale
     velocity.current.x += crosswind * dt
     if (grounded.current) {
@@ -166,7 +165,7 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
       if (!supported) { grounded.current = false; velocity.current.y = -.6 }
     }
     if (wantsJump && grounded.current) { velocity.current.y = 9.6; grounded.current = false }
-    if (!grounded.current) velocity.current.y -= (mode === 'stormline' ? 14.8 : mode === 'zenith' ? 13.2 : 13.8) * dt
+    if (!grounded.current) velocity.current.y -= (mode === 'stormline' ? 14.8 : mode === 'zenith' ? 13.2 : 13.8) * modifiers.gravityMultiplier * dt
     const previousY = position.current.y
     position.current.addScaledVector(velocity.current, dt)
     if (!grounded.current && velocity.current.y < 0) {
@@ -183,7 +182,7 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
         }
       }
     }
-    if (position.current.y < -5) { onFall(); reset(true) }
+    if (position.current.y < -5) { const forgiven = onFall(); reset(true); if (forgiven) setTimeout(() => onProgress(Math.max(0, checkpoint.current.y)), 0) }
     body.current.position.copy(position.current)
     body.current.rotation.z = THREE.MathUtils.damp(body.current.rotation.z, -velocity.current.x * .05, 5, dt)
     if (Math.abs(velocity.current.x) + Math.abs(velocity.current.z) > .08) body.current.rotation.y = THREE.MathUtils.damp(body.current.rotation.y, Math.atan2(velocity.current.x, -velocity.current.z), 10, dt)
@@ -195,7 +194,7 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
     state.camera.position.lerp(lookTarget.clone().add(cameraOffset), .1)
     state.camera.lookAt(lookTarget)
     signalShards.forEach((shard, index) => {
-      if (!claimedShards.current.has(index) && position.current.distanceTo(new THREE.Vector3(shard.x, shard.y, shard.z)) < .85) {
+      if (!claimedShards.current.has(index) && position.current.distanceTo(new THREE.Vector3(shard.x, shard.y, shard.z)) < modifiers.pickupRadius) {
         claimedShards.current.add(index)
         onCollect(index)
       }
@@ -210,9 +209,11 @@ function Player({ running, mode, onProgress, onFall, onCollect, onLand, onBurst,
   </group>
 }
 
-function World({ running, mode, onProgress, onFall, collectedShards, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; onProgress: (height: number) => void; onFall: () => void; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
+function World({ running, mode, modifiers, biome, onProgress, onFall, collectedShards, onCollect, onLand, onBurst, onCheckpoint, onComplete }: { running: boolean; mode: RunMode; modifiers: RunModifiers; biome: BiomeId; onProgress: (height: number) => void; onFall: () => boolean; collectedShards: Set<number>; onCollect: (index: number) => void; onLand: () => void; onBurst: () => void; onCheckpoint: (height: number) => void; onComplete: () => void }) {
   const cables = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
-  const palette = mode === 'stormline' ? { sky: '#9caaa8', fog: '#73827f', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
+  const biomePalette = biome === 'neon-underpass' ? { sky: '#9b9bb6', fog: '#545775', ambient: '#d6d8f2', ground: '#313743' } : biome === 'cloud-cathedral' ? { sky: '#c9d8df', fog: '#a4b9c1', ambient: '#eff7ff', ground: '#61727a' } : biome === 'signal-core' ? { sky: '#e4c9b5', fog: '#b98172', ambient: '#ffe6c7', ground: '#3a2928' } : { sky: '#d5cdbd', fog: '#d5cdbd', ambient: '#fff3d7', ground: '#546451' }
+  const contractTint = mode === 'stormline' ? { sky: '#879a9a', fog: '#667b7b', ambient: '#d5e0d8', ground: '#3d4948' } : mode === 'zenith' ? { sky: '#b9c9d7', fog: '#8fa8b7', ambient: '#e7f1ff', ground: '#465565' } : biomePalette
+  const palette = biome === 'rust-yard' ? contractTint : biomePalette
   return <Canvas shadows camera={{ fov: 56, near: .1, far: 1200, position: [4, 7, 15] }} dpr={[1, 1.75]}>
     <color attach="background" args={[palette.sky]} />
     <fog attach="fog" args={[palette.fog, 34, 190]} />
@@ -228,10 +229,12 @@ function World({ running, mode, onProgress, onFall, collectedShards, onCollect, 
     {signalShards.map((shard, i) => <SignalShardMesh shard={shard} collected={collectedShards.has(i)} key={`shard-${i}`} />)}
     {cables.map((i) => <mesh key={i} position={[(i % 4 - 1.5) * 6.5, 10 + i * 2.1, -6 - i * 1.3]}><cylinderGeometry args={[.035, .035, 18, 6]} /><meshStandardMaterial color="#4a4034" roughness={.8} /></mesh>)}
     <Float speed={1.5} rotationIntensity={.1} floatIntensity={.35}><mesh position={[-5, 17, -11]}><icosahedronGeometry args={[.65, 1]} /><meshStandardMaterial color="#d6a845" metalness={.65} roughness={.25} /></mesh></Float>
-    <Player running={running} mode={mode} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
+    <Player running={running} mode={mode} modifiers={modifiers} onProgress={onProgress} onFall={onFall} onCollect={onCollect} onLand={onLand} onBurst={onBurst} onCheckpoint={onCheckpoint} onComplete={onComplete} />
     <Html position={[0, courseHeight + 1.2, -55]} center distanceFactor={12}><div className="peak-tag">THE SIGNAL</div></Html>
   </Canvas>
 }
+
+const drawCards = (seed: number) => CARD_POOL.map((_, index) => CARD_POOL[(seed + index * 2) % CARD_POOL.length])
 
 function App() {
   const [running, setRunning] = useState(false)
@@ -251,15 +254,20 @@ function App() {
   const [burstReady, setBurstReady] = useState(true)
   const [checkpointHeight, setCheckpointHeight] = useState(0)
   const [mode, setMode] = useState<RunMode>('standard')
+  const [modifiers, setModifiers] = useState<RunModifiers>(DEFAULT_MODIFIERS)
+  const [activeCards, setActiveCards] = useState<SignalCard[]>([])
+  const [pendingCards, setPendingCards] = useState<SignalCard[]>([])
+  const [cardSeed, setCardSeed] = useState(0)
   const progress = Math.min(100, Math.round(height / courseHeight * 100))
-  const modeLabel = mode === 'stormline' ? 'STORMLINE' : mode === 'zenith' ? 'ZENITH' : 'STANDARD'
+  const biome = getBiome(height, courseHeight)
+  const modeLabel = getModeLabel(mode)
   const onProgress = (next: number) => { setHeight(next); if (next > best) { setBest(next); localStorage.setItem('summit-signal-best', String(next)) } }
   useEffect(() => {
     if (!running || completed || !startedAt) return
     const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100)
     return () => window.clearInterval(timer)
   }, [running, completed, startedAt])
-  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setRunning(true) }
+  const startRun = () => { setStarted(true); setCompleted(false); setElapsed(0); setStartedAt(Date.now()); setHeight(0); setCheckpointHeight(0); setFalls(0); setCombo(0); setBurstReady(true); setSignalFlash(''); setCollectedShards(new Set()); setModifiers(DEFAULT_MODIFIERS); setActiveCards([]); setPendingCards([]); setRunning(true) }
   const pauseRun = () => { if (startedAt) setElapsed((Date.now() - startedAt) / 1000); setRunning(false) }
   const resumeRun = () => { setStartedAt(Date.now() - elapsed * 1000); setRunning(true) }
   const completeRun = () => {
@@ -269,14 +277,28 @@ function App() {
     setRunning(false)
     if (!speedrunBest || time < speedrunBest) { setSpeedrunBest(time); localStorage.setItem('summit-signal-speedrun-best', String(time)) }
   }
+  const chooseCard = (card: SignalCard) => { setActiveCards(current => [...current, card]); setModifiers(current => mergeModifiers(current, card)); setPendingCards([]); setRunning(true); setSignalFlash(`${card.title} ONLINE · KEEP CLIMBING`) }
+  useEffect(() => {
+    if (!pendingCards.length) return
+    const chooseWithKey = (event: KeyboardEvent) => { if (event.key === 'Escape' || event.key === '1') chooseCard(pendingCards[0]); else if (event.key === '2' && pendingCards[1]) chooseCard(pendingCards[1]); else if (event.key === '3' && pendingCards[2]) chooseCard(pendingCards[2]) }
+    addEventListener('keydown', chooseWithKey)
+    return () => removeEventListener('keydown', chooseWithKey)
+  }, [pendingCards])
+  const handleFall = () => {
+    if (modifiers.anchorCharges > 0) { setModifiers(current => ({ ...current, anchorCharges: current.anchorCharges - 1 })); setSignalFlash('ANCHOR SPENT · FALL FORGIVEN'); return true }
+    setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT'); return false
+  }
+  const handleCheckpoint = (next: number) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`); setCardSeed(seed => seed + 1); setPendingCards(drawCards(cardSeed)); setRunning(false) }
   return <main>
-    <World running={running} mode={mode} onProgress={onProgress} onFall={() => { setFalls(v => v + 1); setCombo(0); setSignalFlash('RUN BROKEN · RETURNING TO CHECKPOINT') }} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600) }} onCheckpoint={(next) => { setCheckpointHeight(next); setSignalFlash(`CHECKPOINT LOCKED · ${Math.floor(next * 10)}M`) }} onComplete={completeRun} />
+    <World running={running} mode={mode} modifiers={modifiers} biome={biome} onProgress={onProgress} onFall={handleFall} collectedShards={collectedShards} onCollect={(index) => { setCollectedShards(current => new Set(current).add(index)); setSignalFlash(`SIGNAL ${index + 1}/5 CAPTURED`) }} onLand={() => setCombo(current => { const next = current + 1; if (next > comboBest) { setComboBest(next); localStorage.setItem('summit-signal-combo-best', String(next)) }; return next })} onBurst={() => { setBurstReady(false); setSignalFlash('SIGNAL BURST · KEEP CLIMBING'); window.setTimeout(() => setBurstReady(true), 2600 * modifiers.burstCooldownMultiplier) }} onCheckpoint={handleCheckpoint} onComplete={completeRun} />
     <section className="brand"><p>ALTITUDE // 01</p><h1>SUMMIT<br /><i>SIGNAL</i></h1><span>an ascent with consequences</span></section>
     <section className="telemetry" aria-label="Game telemetry"><div><span>ALTITUDE</span><strong>{Math.floor(height * 10)}<small>m</small></strong></div><div><span>PERSONAL BEST</span><strong>{Math.floor(best * 10)}<small>m</small></strong></div><div><span>RETRIES</span><strong>{falls.toString().padStart(2, '0')}</strong></div><div><span>SIGNALS</span><strong>{collectedShards.size}<small>/5</small></strong></div></section>
     <section className="speedrun" aria-label="Speedrun timing"><div><span>RUN TIME</span><strong>{formatTime(elapsed)}</strong></div><div><span>SPEEDRUN PB</span><strong>{speedrunBest ? formatTime(speedrunBest) : '--:--.-'}</strong></div></section>
     {running && <section className="run-stats" aria-label="Run streak"><span>LANDING STREAK</span><strong>{combo.toString().padStart(2, '0')}</strong><small>BEST {comboBest.toString().padStart(2, '0')}</small></section>}
     {running && <section className={`burst ${burstReady ? 'ready' : ''}`} aria-label="Signal burst"><span>SIGNAL BURST</span><strong>{burstReady ? 'READY' : 'CHARGING'}</strong><small>SHIFT · AIR RECOVERY</small></section>}
     {running && <div className={`contract-badge contract-${mode}`} aria-label={`Active contract ${modeLabel}`}>CONTRACT / <strong>{modeLabel}</strong></div>}
+    {running && <div className="biome-tag">ZONE / <strong>{biomeLabels[biome]}</strong></div>}
+    {running && activeCards.length > 0 && <div className="active-cards" aria-label="Active signal cards">{activeCards.map(card => <span key={card.id} style={{ borderColor: card.accent }} title={`${card.title}: ${card.upside}`}><b>{card.title.slice(0, 1)}</b></span>)}</div>}
     {running && <div className="checkpoint">ANCHOR <strong>{Math.floor(checkpointHeight * 10)}M</strong></div>}
     <section className="route"><span>ROUTE 01 / CLOUDLINE · 1KM</span><div><i style={{ width: `${progress}%` }} /></div><b>{progress}%</b></section>
     {!started && !completed && <section className="start-panel"><div className="eyebrow">SURVIVAL CLIMBING PROTOTYPE · SIGNAL HUNT</div><h2>EVERY LEDGE<br />IS A DECISION.</h2><p>Climb a discarded world suspended above the weather. Beat the clock, collect all five shards, and reach the summit.</p><div className="contracts" role="group" aria-label="Run contract"><button className={mode === 'standard' ? 'selected' : ''} onClick={() => setMode('standard')}><b>STANDARD</b><small>BASELINE LINE</small></button><button className={mode === 'stormline' ? 'selected' : ''} onClick={() => setMode('stormline')}><b>STORMLINE</b><small>HEAVIER WIND</small></button><button className={mode === 'zenith' ? 'selected' : ''} onClick={() => setMode('zenith')}><b>ZENITH</b><small>LIGHTER GRAVITY</small></button></div><button onClick={startRun}>BEGIN ASCENT <span>↗</span></button><small>A / D STEER · W / S ADVANCE · SHIFT BURST · MOUSE LOOK</small></section>}
@@ -284,6 +306,7 @@ function App() {
     {started && !running && !completed && <button className="resume" onClick={resumeRun}>RESUME RUN ↗</button>}
     {completed && <section className="finish-panel"><div className="eyebrow">SUMMIT REACHED · {modeLabel} · SIGNAL HUNT {collectedShards.size}/5</div><h2>YOU MADE<br /><i>THE SIGNAL.</i></h2><p>Final time <strong>{formatTime(finalTime)}</strong>{speedrunBest === finalTime ? ' · new personal best' : ''}</p><button onClick={startRun}>RUN IT BACK <span>↗</span></button></section>}
     {running && <div className="reticle" aria-hidden="true"><i /><b /></div>}
+    {pendingCards.length > 0 && <section className="card-dialog" role="dialog" aria-modal="true" aria-label="Choose a signal card"><div className="eyebrow">CHECKPOINT LOCKED · CHOOSE YOUR EDGE</div><h2>BUILD<br /><i>THE RUN.</i></h2><p>Pick one signal. The climb resumes the moment you commit.</p><div className="card-options">{pendingCards.map((card, index) => <button className="route-card" key={card.id} onClick={() => chooseCard(card)} style={{ '--card-accent': card.accent } as React.CSSProperties}><span className="card-index">0{index + 1}</span><strong>{card.title}</strong><b>{card.upside}</b><small>COST · {card.cost}</small><em>{index + 1}</em></button>)}</div><small className="card-hint">1 / 2 / 3 SELECT · ESC ACCEPTS FIRST</small></section>}
     {running && signalFlash && <div className="signal-flash" role="status">{signalFlash}</div>}
     {running && <div className="camera-hint">C / RECENTER VIEW</div>}
     <footer><span>BUILD 01.07</span><span>ORIGINAL PROCEDURAL ENVIRONMENT</span><span>© 2026 SUMMIT SIGNAL</span></footer>
