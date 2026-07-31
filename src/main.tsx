@@ -161,6 +161,27 @@ function SignalArtifactMesh({ artifact, collected }: { artifact: SignalArtifact;
   </Float>
 }
 
+function RouteRail({ mode }: { mode: RunMode }) {
+  const rail = useMemo(() => {
+    const points = platforms.filter((platform, index) => index % 2 === 0 || index === platforms.length - 1).map((platform, index) => new THREE.Vector3(platform.x + (index % 2 ? 1.1 : -1.1), platform.y + 1.15, platform.z + .45))
+    return new THREE.CatmullRomCurve3(points)
+  }, [])
+  const color = mode === 'stormline' ? '#ff5261' : mode === 'zenith' ? '#8ce7ff' : '#f0b85f'
+  return <group>
+    <mesh><tubeGeometry args={[rail, 180, .035, 6, false]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.35} transparent opacity={.56} depthWrite={false} /></mesh>
+    <mesh><tubeGeometry args={[rail, 90, .11, 5, false]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={.45} transparent opacity={.08} depthWrite={false} /></mesh>
+  </group>
+}
+
+function DistrictPulse({ y, z, color }: { y: number; z: number; color: string }) {
+  const ring = useRef<THREE.Group>(null)
+  useFrame((state) => { if (ring.current) { ring.current.rotation.y = state.clock.elapsedTime * .4; ring.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 2.2 + y) * .04) } })
+  return <group ref={ring} position={[0, y, z]}>
+    <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[7.2, .06, 8, 48]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.6} transparent opacity={.5} depthWrite={false} /></mesh>
+    <mesh position={[0, 0, 0]}><cylinderGeometry args={[.025, .025, 15, 6]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} transparent opacity={.3} depthWrite={false} /></mesh>
+  </group>
+}
+
 function WorldBackdrop({ mode }: { mode: RunMode }) {
   const stormline = mode === 'stormline'
   const zenith = mode === 'zenith'
@@ -175,6 +196,11 @@ function WorldBackdrop({ mode }: { mode: RunMode }) {
   ], [])
   const gates = useMemo(() => Array.from({ length: 4 }, (_, index) => ({ y: 18 + index * 23, z: -13 - index * 25, color: index % 2 ? '#d7ad47' : '#b63a23' })), [])
   return <group>
+    <RouteRail mode={mode} />
+    <DistrictPulse y={18} z={-13} color={stormline ? '#ff5362' : '#f0b85f'} />
+    <DistrictPulse y={41} z={-38} color={zenith ? '#8ce7ff' : '#58e4dc'} />
+    <DistrictPulse y={64} z={-63} color={stormline ? '#ff5362' : '#c77dff'} />
+    <DistrictPulse y={87} z={-88} color={zenith ? '#8ce7ff' : '#ff794d'} />
     <mesh position={[0, 92, -150]}><sphereGeometry args={[12, 24, 16]} /><meshStandardMaterial color={sunColor} emissive={stormline ? '#a51f2d' : zenith ? '#6f9fe8' : '#b85b2e'} emissiveIntensity={.5} roughness={1} /></mesh>
     {skyline.map((tower, index) => <group key={`tower-${index}`} position={[tower.x, tower.y, tower.z]}>
       <mesh castShadow><boxGeometry args={[tower.width, tower.height, tower.depth]} /><meshStandardMaterial color={index % 3 === 0 ? skylineColor : (stormline ? '#3e4047' : zenith ? '#52687a' : '#46504c')} roughness={.85} metalness={.3} /></mesh>
